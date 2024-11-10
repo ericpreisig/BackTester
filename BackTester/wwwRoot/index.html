@@ -1,0 +1,78 @@
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+
+<style>
+    body {
+        padding-top: 50px;
+    }
+    .tv-lightweight-charts {
+        margin: auto;
+    }
+</style>
+
+<body>
+
+</body>
+
+<script>
+    const chart = LightweightCharts.createChart(document.body, { width: 1800, height: 600 });
+
+    $.ajax({
+        type: 'GET',
+        url: '/Test',
+        success: function (data, status, xhr) {
+
+            const obj = JSON.parse(data);
+
+            for (var i = 0; i < obj.length; i++) {
+                var dataSet = [];
+
+                for (var j = 0; j < obj[i].plots.length; j++) {
+                    dataSet.push(obj[i].plots[j]);
+                }
+
+                var config = obj[i].config ?? undefined;
+                var type = obj[i].type;
+
+                switch (obj[i].postion)
+                {
+                    case 0:
+                        setSerie(type, chart, config).setData(dataSet);
+                        break;
+                    case 1:
+                        const serie = LightweightCharts.createChart(document.body, { width: 1800, height: 200 });
+                        chart.timeScale().subscribeVisibleLogicalRangeChange(timeRange => serie.timeScale().setVisibleLogicalRange(timeRange));
+                        serie.timeScale().subscribeVisibleLogicalRangeChange(timeRange => chart.timeScale().setVisibleLogicalRange(timeRange));
+                        setSerie(type, serie, config).setData(dataSet);
+                        break;
+                }
+            }
+        }
+    });
+
+    function setSerie(type, target, config) {
+        switch (type)
+        {
+            case 0:
+                return target.addCandlestickSeries(config)
+            case 1:
+                return target.addLineSeries(config)
+        }
+    }
+
+    function getCrosshairDataPoint(series, param) {
+        if (!param.time) {
+            return null;
+        }
+        const dataPoint = param.seriesData.get(series);
+        return dataPoint || null;
+    }
+
+    function syncCrosshair(chart, series, dataPoint) {
+        if (dataPoint) {
+            chart.setCrosshairPosition(dataPoint.value, dataPoint.time, series);
+            return;
+        }
+        chart.clearCrosshairPosition();
+    }
+</script>

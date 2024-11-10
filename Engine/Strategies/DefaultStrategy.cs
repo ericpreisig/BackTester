@@ -1,0 +1,17 @@
+﻿using Engine.Charts;
+using Engine.Indicators;
+
+namespace Engine.Strategies
+{
+    public class DefaultStrategy : BaseStrategy
+    {
+        public DefaultStrategy(params IIndicator[] indicators)
+        {
+            Add(indicators);
+        }
+
+        public override Task LoadAsync() => Task.CompletedTask;
+
+        public override Task CandelFinishedAsync(Candle candle) => Task.CompletedTask;
+    }
+}
