@@ -10,5 +10,6 @@ namespace Engine.Indicators
         List<IIndicator> Indicators { get; }
         Task UpdateAsync(Symbol symbol, DateTime time);
         Task LoadAsync();
+        void OnAfterLoad(EventArgs e);
     }
 }

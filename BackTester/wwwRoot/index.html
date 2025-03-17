@@ -33,31 +33,40 @@
 
                 var config = obj[i].config ?? undefined;
                 var type = obj[i].type;
+                var markers = obj[i].markers;
 
                 switch (obj[i].postion)
                 {
                     case 0:
-                        setSerie(type, chart, config).setData(dataSet);
+                        setSerie(type, chart, config, markers).setData(dataSet);
                         break;
                     case 1:
                         const serie = LightweightCharts.createChart(document.body, { width: 1800, height: 200 });
                         chart.timeScale().subscribeVisibleLogicalRangeChange(timeRange => serie.timeScale().setVisibleLogicalRange(timeRange));
                         serie.timeScale().subscribeVisibleLogicalRangeChange(timeRange => chart.timeScale().setVisibleLogicalRange(timeRange));
-                        setSerie(type, serie, config).setData(dataSet);
+                        setSerie(type, serie, config, markers).setData(dataSet);
                         break;
                 }
             }
         }
     });
 
-    function setSerie(type, target, config) {
+    function setSerie(type, target, config, markers) {
+
+        var series = null;
         switch (type)
         {
             case 0:
-                return target.addCandlestickSeries(config)
+                series = target.addSeries(LightweightCharts.CandlestickSeries, config);
+                break;
             case 1:
-                return target.addLineSeries(config)
+                series = target.addSeries(LightweightCharts.LineSeries, config);
+                break;
         }
+
+        LightweightCharts.createSeriesMarkers(series, markers);
+
+        return series;
     }
 
     function getCrosshairDataPoint(series, param) {

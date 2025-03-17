@@ -4,5 +4,6 @@
     {
         Candle,
         Line,
+        Marker,
     }
 }

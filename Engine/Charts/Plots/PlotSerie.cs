@@ -17,10 +17,16 @@ namespace Engine.Charts.Plots
         public abstract PlotTypeEnum Type { get; }
         public PlotPositionEnum Postion { get; set; }
         public IEnumerable<T> Plots { get; } = new List<T>();
+        public IEnumerable<Marker> Markers { get; } = new List<Marker>();
         public abstract U Config { get; }
         public void Add(T plot)
         {
             ((List<T>)Plots).Add(plot);
+        }
+
+        public void Add(Marker marker)
+        {
+            ((List<Marker>)Markers).Add(marker);
         }
     }
 }

@@ -12,6 +12,6 @@ namespace Engine.Strategies
 
         public override Task LoadAsync() => Task.CompletedTask;
 
-        public override Task CandelFinishedAsync(Candle candle) => Task.CompletedTask;
+        public override Task CandleFinishedAsync(Candle candle) => Task.CompletedTask;
     }
 }

@@ -1,3 +1,4 @@
+using BackTester.Strategies;
 using Engine.Charts;
 using Engine.Core;
 using Engine.Indicators.Core;
@@ -19,14 +20,11 @@ namespace BackTester.Controllers
             var chart = new Chart()
             {
                 DateFrom = new DateTime(2018, 01, 01),
-                Strategy = new DefaultStrategy(
-                    new SmaIndicator(new SmaConfig(30, Color.Red)), 
-                    new SmaIndicator(new SmaConfig(50, Color.Black)), 
-                    new PriceIndicator()),
+                Strategy = new SmaCrossingStrategy(1000),
                 Symbol = new Symbol("BTC-USD")
             };
 
-            var context = new Context(chart, 1000);
+            var context = new Context(chart);
 
             var plots = await context.ExecuteAsync();
 

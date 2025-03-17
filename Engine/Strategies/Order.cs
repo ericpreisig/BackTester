@@ -4,9 +4,8 @@ namespace Engine.Strategies
 {
     public class Order
     {
-        ActionEnum Action { get; }
-        decimal CurrentPrice { get; }
-        decimal Amount { get; }
-        decimal Quantity { get; }
+        public ActionEnum Action { get; set; }
+        public decimal CurrentPrice { get; set; }
+        public decimal Quantity { get; set; }
     }
 }

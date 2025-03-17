@@ -9,7 +9,7 @@ namespace Engine.Indicators.Core
     {
         private readonly SmaConfig _config;
         private readonly List<Candle> _candles = new List<Candle>();
-        private PlotLineSerie _average;
+        public PlotLineSerie Average;
 
         public SmaIndicator(SmaConfig config)
         {
@@ -18,21 +18,18 @@ namespace Engine.Indicators.Core
 
         public override Task LoadAsync() 
         {
-            Add(_average = new PlotLineSerie(nameof(SmaIndicator), PlotPositionEnum.OnChart, new PlotLineSerieConfig
-            {
-                Color = ColorTranslator.ToHtml(_config.Color)
-            }));
+            Add(Average = new PlotLineSerie(nameof(SmaIndicator), PlotPositionEnum.OnChart, new PlotLineSerieConfig(_config.Color)));
             
             return Task.CompletedTask;
         }
 
-        public override Task CandelFinishedAsync(Candle candle)
+        public override Task CandleFinishedAsync(Candle candle)
         {
             _candles.Add(candle);
 
             if(_candles.Count == _config.Length)
             {
-                _average.Add(new PlotLine(candle.Time, _candles.Average(a => a.Close)));
+                Average.Add(new PlotLine(candle.Time, _candles.Average(a => a.Close)));
                 _candles.RemoveAt(0);
             }
             return Task.CompletedTask;

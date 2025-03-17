@@ -7,11 +7,9 @@ namespace Engine.Core
     public class Context
     {
         public Chart Chart { get; }
-        public decimal PortfolioValue { get; }
-        public Context(Chart chart, decimal portfolioValue)
+        public Context(Chart chart)
         {
             Chart = chart;
-            PortfolioValue = portfolioValue;
         }
 
         public async Task<IEnumerable<IPlotSerie<IPlot, ISerieConfig>>> ExecuteAsync()
@@ -55,6 +53,8 @@ namespace Engine.Core
             previousIndicators.Add(indicator);
 
             await indicator.LoadAsync();
+
+            indicator.OnAfterLoad(null);
 
             indicators.Add(indicator);
 

@@ -1,5 +1,6 @@
 ﻿using Engine.Charts.Plots.Candle;
 using Engine.Enums;
+using System.Drawing;
 
 namespace Engine.Charts.Plots.Line
 {
@@ -16,6 +17,9 @@ namespace Engine.Charts.Plots.Line
 
     public class PlotLineSerieConfig : ISerieConfig
     {
+        public PlotLineSerieConfig(Color color) => Color = ColorTranslator.ToHtml(color);
+        public PlotLineSerieConfig() { }
+
         public string Color { get; set; }
     }
 }

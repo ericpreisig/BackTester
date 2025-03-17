@@ -9,9 +9,17 @@ namespace Engine.Indicators
         public List<Symbol> Symbols { get; } = new List<Symbol>();
         public List<IIndicator> Indicators { get; } = new List<IIndicator>();
 
+        public event EventHandler AfterLoad;
+        public event EventHandler<CandleEventArgs> AfterCandle;
+
         public void Add(params Symbol[] symbols)
         {
             Symbols.AddRange(symbols);
+        }
+
+        public void OnAfterLoad(EventArgs e)
+        {
+            AfterLoad?.Invoke(this, e);
         }
 
         public void Add(params IIndicator[] indicators)
@@ -37,11 +45,20 @@ namespace Engine.Indicators
 
             if (candle != null)
             {
-                await CandelFinishedAsync(candle);
+                await CandleFinishedAsync(candle);
+                AfterCandle?.Invoke(this, new CandleEventArgs()
+                {
+                    Candle = candle
+                });
             }
         }
 
         public abstract Task LoadAsync();
-        public abstract Task CandelFinishedAsync(Candle candle);
+        public abstract Task CandleFinishedAsync(Candle candle);
+    }
+
+    public class CandleEventArgs : EventArgs
+    {
+        public Candle Candle { get; set; }
     }
 }
