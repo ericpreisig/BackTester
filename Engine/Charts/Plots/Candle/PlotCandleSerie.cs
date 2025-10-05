@@ -8,7 +8,7 @@ namespace Engine.Charts.Plots.Candle
         public override PlotTypeEnum Type => PlotTypeEnum.Candle;
         public override PlotCandleSerieConfig Config { get; }
 
-        public PlotCandleSerie(string name, PlotPositionEnum postion, PlotCandleSerieConfig config = null) : base(name, postion)
+        public PlotCandleSerie(string name, PlotPositionEnum postion, PlotCandleSerieConfig config = null, string chartName = "") : base(name, postion, chartName)
         {
             Config = config ?? new PlotCandleSerieConfig();
         }

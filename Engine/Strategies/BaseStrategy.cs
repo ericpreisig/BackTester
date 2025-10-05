@@ -1,5 +1,6 @@
 ﻿using Engine.Charts;
 using Engine.Charts.Plots;
+using Engine.Charts.Plots.Area;
 using Engine.Charts.Plots.Line;
 using Engine.Core;
 using Engine.Indicators;
@@ -14,7 +15,7 @@ namespace Engine.Strategies
         private Portfolio _buyAndHoldPortfolio;
         private PriceIndicator _priceIndicator;
         private PlotLineSerie _equity;
-        private PlotLineSerie _buyAndHold;
+        private AreaSerie _buyAndHold;
 
         protected BaseStrategy(decimal capital) : this()
         {
@@ -25,8 +26,8 @@ namespace Engine.Strategies
         protected BaseStrategy()
         {
             Add(_priceIndicator = new PriceIndicator());
-            Add(_equity = new PlotLineSerie("Equity", Enums.PlotPositionEnum.UnderChart));
-            Add(_buyAndHold = new PlotLineSerie("BuyAndHold", Enums.PlotPositionEnum.UnderChart));
+            Add(_equity = new PlotLineSerie("Equity", Enums.PlotPositionEnum.UnderChart, chartName: "Portfolio"));
+            Add(_buyAndHold = new AreaSerie("BuyAndHold", Enums.PlotPositionEnum.UnderChart, chartName: "Portfolio"));
 
             _priceIndicator.AfterCandle += (s, e) =>
             {
@@ -51,7 +52,7 @@ namespace Engine.Strategies
             var valueHold = _buyAndHoldPortfolio.Cash + _buyAndHoldPortfolio.Orders.Sum(a => a.Quantity) * candle.Close;
 
             _equity.Add(new PlotLine(candle.Time, value));
-            _buyAndHold.Add(new PlotLine(candle.Time, valueHold));
+            _buyAndHold.Add(new PlotArea(candle.Time, valueHold));
         }
 
         public void BuyQuantity(Candle candle, decimal quantity)

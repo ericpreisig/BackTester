@@ -9,7 +9,7 @@ namespace Engine.Charts.Plots.Line
         public override PlotTypeEnum Type => PlotTypeEnum.Line;
         public override PlotLineSerieConfig Config { get; }
 
-        public PlotLineSerie(string name, PlotPositionEnum postion, PlotLineSerieConfig config = null) : base(name, postion)
+        public PlotLineSerie(string name, PlotPositionEnum postion, PlotLineSerieConfig config = null, string chartName = "") : base(name, postion, chartName)
         {
             Config = config ?? new PlotLineSerieConfig();
         }

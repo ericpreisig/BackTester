@@ -5,5 +5,6 @@
         Candle,
         Line,
         Marker,
+        Area,
     }
 }

@@ -11,7 +11,6 @@
 </style>
 
 <body>
-
 </body>
 
 <script>
@@ -23,7 +22,9 @@
         success: function (data, status, xhr) {
 
             const obj = JSON.parse(data);
+            const charts = new Map();
 
+            charts.set("Main", { chart: chart, series: new Map() });
             for (var i = 0; i < obj.length; i++) {
                 var dataSet = [];
 
@@ -34,20 +35,81 @@
                 var config = obj[i].config ?? undefined;
                 var type = obj[i].type;
                 var markers = obj[i].markers;
+                var chartName = obj[i].chartName;
+                var name = obj[i].name;
 
                 switch (obj[i].postion)
                 {
                     case 0:
-                        setSerie(type, chart, config, markers).setData(dataSet);
+                        let serieMain = setSerie(type, chart, config, markers);
+                        charts.get("Main").series.set(serieMain, name);
+                        serieMain.setData(dataSet);
                         break;
                     case 1:
-                        const serie = LightweightCharts.createChart(document.body, { width: 1800, height: 200 });
-                        chart.timeScale().subscribeVisibleLogicalRangeChange(timeRange => serie.timeScale().setVisibleLogicalRange(timeRange));
-                        serie.timeScale().subscribeVisibleLogicalRangeChange(timeRange => chart.timeScale().setVisibleLogicalRange(timeRange));
-                        setSerie(type, serie, config, markers).setData(dataSet);
+                        var otherChart = undefined;
+                        if (charts.has(chartName))
+                        {
+                            otherChart = charts.get(chartName).chart;
+                        }
+                        else
+                        {
+                            otherChart = LightweightCharts.createChart(document.body, { width: 1800, height: 200 });
+                            charts.set(chartName, { chart: otherChart, series: new Map() });
+                        }
+
+                        chart.timeScale().subscribeVisibleLogicalRangeChange(timeRange => otherChart.timeScale().setVisibleLogicalRange(timeRange));
+                        otherChart.timeScale().subscribeVisibleLogicalRangeChange(timeRange => chart.timeScale().setVisibleLogicalRange(timeRange));
+                        let serieOther = setSerie(type, otherChart, config, markers)
+                        serieOther.setData(dataSet);
+                        charts.get(chartName).series.set(serieOther, name);
+
                         break;
                 }
             }
+
+            var chartId = 0;
+            
+            charts.forEach((value, key, _) => {
+
+                var chartHtml = document.getElementsByClassName("tv-lightweight-charts")[chartId];
+                var list = document.createElement("p");
+                var title = document.createElement("h2");
+                title.innerHTML = key;
+                
+                var index = 0;
+                value.series.forEach((name, _, __) => {
+                    var node = document.createElement("span");
+                    node.setAttribute("class", key + "_" + name + "_" + index);
+                    node.innerHTML = `${name} : null | `;
+                    list.appendChild(node)
+                    index++;
+                });    
+                
+                document.body.insertBefore(title, chartHtml);
+                document.body.insertBefore(list, chartHtml);
+
+                value.chart.subscribeCrosshairMove(param => {
+                    if (param.time) {
+                        var index = 0;
+                        param.seriesData.forEach((serie, k, a) => {
+
+                            let name = value.series.get(k);
+                            var v = serie.value;
+                            if (v == undefined) {
+                                v = serie.close;
+                            }
+
+                            var data = document.getElementsByClassName(key + "_" + name + "_" + index)[0];
+                            data.innerHTML = `${name} : ${v.toFixed(2)} | `;
+                            index++;
+
+                        })
+                    }
+                });
+
+                chartId++;
+
+            });
         }
     });
 
@@ -61,6 +123,9 @@
                 break;
             case 1:
                 series = target.addSeries(LightweightCharts.LineSeries, config);
+                break;
+            case 3:
+                series = target.addSeries(LightweightCharts.AreaSeries, config);
                 break;
         }
 

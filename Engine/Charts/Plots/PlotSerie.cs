@@ -7,13 +7,20 @@ namespace Engine.Charts.Plots
         where T : class, IPlot 
         where U : class, ISerieConfig
     {
-        public PlotSerie(string name, PlotPositionEnum postion)
+        public PlotSerie(string name, PlotPositionEnum postion, string chartName)
         {
             Name = name;
             Postion = postion;
+            ChartName = chartName;
+
+            if(ChartName == string.Empty)
+            {
+                ChartName = Guid.NewGuid().ToString();
+            }
         }
 
         public string Name { get; set; }
+        public string ChartName { get; set; }
         public abstract PlotTypeEnum Type { get; }
         public PlotPositionEnum Postion { get; set; }
         public IEnumerable<T> Plots { get; } = new List<T>();
