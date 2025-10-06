@@ -10,13 +10,12 @@ namespace BackTester.Strategies
     {
         private SmaIndicator _slow;
         private SmaIndicator _fast;
-        public PlotLineSerie SolPrice;
 
         public SmaCrossingStrategy(decimal capital) : base(capital)
         {
         }
 
-        public override async Task LoadAsync()
+        public override async Task LoadAsync(Symbol symbol)
         {
             Add(_slow = new SmaIndicator(new SmaConfig(20, Color.Red)));
             Add(_fast = new SmaIndicator(new SmaConfig(100, Color.Blue)));

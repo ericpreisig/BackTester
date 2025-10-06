@@ -68,8 +68,11 @@ namespace Engine.Strategies
 
         public void BuyAmount(Candle candle, decimal amount)
         {
-            var quantity = amount / candle.Close;
-            BuyQuantity(candle, quantity);
+            if(candle.Close != 0)
+            {
+                var quantity = amount / candle.Close;
+                BuyQuantity(candle, quantity);
+            }  
         }
 
         public void SellQuantity(Candle candle, decimal quantity)

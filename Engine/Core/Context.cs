@@ -29,13 +29,14 @@ namespace Engine.Core
             var indicators = new List<IIndicator>();
             indicators.AddRange(await GetIndicators(Chart.Strategy));
 
-            await Chart.Symbol.LoadAsync(Chart.DateFrom, Chart.DateTo);
+            await Chart.Symbol.LoadAsync(Chart.HistoryFrom, Chart.DateTo);
+            Chart.Symbol.OnAfterLoad(null);
 
             foreach (var indicator in indicators)
             {
                 foreach (var symbol in indicator.Symbols)
                 {
-                    await symbol.LoadAsync(Chart.DateFrom, Chart.DateTo);
+                    await symbol.LoadAsync(Chart.HistoryFrom, Chart.DateTo);
                 }
             }
         }
@@ -52,7 +53,7 @@ namespace Engine.Core
 
             previousIndicators.Add(indicator);
 
-            await indicator.LoadAsync();
+            await indicator.LoadAsync(Chart.Symbol);
 
             indicator.OnAfterLoad(null);
 

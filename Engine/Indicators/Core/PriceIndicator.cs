@@ -8,7 +8,7 @@ namespace Engine.Indicators.Core
     {
         public PlotCandleSerie Price;
 
-        public override Task LoadAsync() 
+        public override Task LoadAsync(Symbol symbol) 
         {
             Add(Price = new PlotCandleSerie(nameof(PriceIndicator), PlotPositionEnum.OnChart));
             return Task.CompletedTask;

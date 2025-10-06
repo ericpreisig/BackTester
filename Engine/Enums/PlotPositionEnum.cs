@@ -4,5 +4,6 @@
     {
         OnChart,
         UnderChart,
+        Hidden,
     }
 }

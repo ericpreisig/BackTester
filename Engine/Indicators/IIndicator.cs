@@ -9,7 +9,7 @@ namespace Engine.Indicators
         List<Symbol> Symbols { get; }
         List<IIndicator> Indicators { get; }
         Task UpdateAsync(Symbol symbol, DateTime time);
-        Task LoadAsync();
+        Task LoadAsync(Symbol symbol);
         void OnAfterLoad(EventArgs e);
     }
 }

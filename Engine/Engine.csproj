@@ -6,6 +6,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Skender.Stock.Indicators" Version="3.0.0-preview.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\YahooFinanceApi\YahooFinanceApi.csproj" />
   </ItemGroup>
 

@@ -10,7 +10,7 @@ namespace Engine.Strategies
             Add(indicators);
         }
 
-        public override Task LoadAsync() => Task.CompletedTask;
+        public override Task LoadAsync(Symbol symbol) => Task.CompletedTask;
 
         public override Task CandleFinishedAsync(Candle candle) => Task.CompletedTask;
     }

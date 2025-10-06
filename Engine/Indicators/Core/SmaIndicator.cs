@@ -16,7 +16,7 @@ namespace Engine.Indicators.Core
             _config = config;
         }
 
-        public override Task LoadAsync() 
+        public override Task LoadAsync(Symbol symbol) 
         {
             Add(Average = new PlotLineSerie(nameof(SmaIndicator), PlotPositionEnum.OnChart, new PlotLineSerieConfig(_config.Color)));
             

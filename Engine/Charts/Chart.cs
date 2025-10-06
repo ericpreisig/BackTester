@@ -4,6 +4,7 @@ namespace Engine.Charts
 {
     public class Chart
     {
+        public DateTime HistoryFrom { get; set; }
         public DateTime DateFrom { get; set; }
         public DateTime DateTo { get; set; } = DateTime.Now;
         public Symbol Symbol { get; set; }

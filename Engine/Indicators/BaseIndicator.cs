@@ -53,7 +53,7 @@ namespace Engine.Indicators
             }
         }
 
-        public abstract Task LoadAsync();
+        public abstract Task LoadAsync(Symbol symbol);
         public abstract Task CandleFinishedAsync(Candle candle);
     }
 

@@ -1,8 +1,9 @@
 ﻿using Engine.Enums;
+using Skender.Stock.Indicators;
 
 namespace Engine.Charts
 {
-    public record Candle
+    public record Candle : IQuote
     {
         public DateTime Time { get; init; }
         public decimal Open { get; init; }
@@ -10,6 +11,10 @@ namespace Engine.Charts
         public decimal Low { get; init; }
         public decimal Close { get; init; }
         public decimal Volume { get; init; }
+
+        public double Value => (double)Close;
+
+        public DateTime Timestamp => Time;
 
         /// <summary>
         /// Gets the price at a point in the candle's lifetime.
