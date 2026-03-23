@@ -106,33 +106,10 @@
 
 <div class="chart-container">
     <div class="chart-wrapper">
-        <div class="charts-column" style="display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0;" @key="_chartKey">
-            <div class="main-chart">
-                <ChartComponent @ref="_mainChart" />
-            </div>
-
-            @if (_chartDatas != null)
-            {
-                var underChartGroups = _chartDatas
-                    .Where(c => c.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
-                    .GroupBy(c => c.ChartName)
-                    .ToList();
-
-                @for (var i = 0; i < _underChartCount; i++)
-                {
-                    var currentIndex = i;
-                    var groupName = underChartGroups.ElementAtOrDefault(currentIndex)?.Key ?? "Under";
-                    <div class="sub-chart" style="margin-top: 15px;">
-                        <ChartComponent @ref="_underCharts[currentIndex]" />
-                    </div>
-                    <div class="chart-metrics" style="display: none;">
-                        <!-- Hidden subchart metrics placeholder -->
-                    </div>
-                }
-            }
+        <div class="main-chart" @key="_chartKey">
+            <ChartComponent @ref="_mainChart" />
         </div>
-
-        <div class="chart-metrics" style="width: 250px;">
+        <div class="chart-metrics">
             <div class="tabs">
                 <div class="tab @(_activeTab == "Stats" ? "active" : "")" @onclick="@(() => _activeTab = "Stats")">Stats</div>
                 <div class="tab @(_activeTab == "Settings" ? "active" : "")" @onclick="@(() => _activeTab = "Settings")">Settings</div>
@@ -150,29 +127,6 @@
                         </div>
                     }
                 }
-                @if (_chartDatas != null)
-                {
-                    var underChartGroups = _chartDatas
-                        .Where(c => c.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
-                        .GroupBy(c => c.ChartName)
-                        .ToList();
-
-                    @for (var i = 0; i < _underChartCount; i++)
-                    {
-                        var groupName = underChartGroups.ElementAtOrDefault(i)?.Key ?? "Under";
-                        <h4 style="margin-top: 15px; color: #fff; padding-bottom: 5px; border-bottom: 1px solid #2B2B43">@groupName</h4>
-                        if (_chartMetrics.TryGetValue(groupName, out var underMetrics))
-                        {
-                            foreach (var kvp in underMetrics)
-                            {
-                                <div class="metric-item">
-                                    <span class="metric-key" title="@GetTooltip(kvp.Key)">@kvp.Key:</span>
-                                    <span class="metric-value">@kvp.Value</span>
-                                </div>
-                            }
-                        }
-                    }
-                }
             }
             else
             {
@@ -184,6 +138,37 @@
         </div>
     </div>
 
+    @if (_chartDatas != null)
+    {
+        var underChartGroups = _chartDatas
+            .Where(c => c.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
+            .GroupBy(c => c.ChartName)
+            .ToList();
+
+        @for (var i = 0; i < _underChartCount; i++)
+        {
+            var currentIndex = i;
+            var groupName = underChartGroups.ElementAtOrDefault(currentIndex)?.Key ?? "Under";
+            <div class="chart-wrapper">
+                <div class="sub-chart" @key="_chartKey">
+                    <ChartComponent @ref="_underCharts[currentIndex]" />
+                </div>
+                <div class="chart-metrics">
+                    <h4 style="margin-top: 0; color: #fff; padding-bottom: 5px; border-bottom: 1px solid #2B2B43">@groupName Stats</h4>
+                    @if (_chartMetrics.TryGetValue(groupName, out var underMetrics))
+                    {
+                        @foreach (var kvp in underMetrics)
+                        {
+                            <div class="metric-item">
+                                <span class="metric-key" title="@GetTooltip(kvp.Key)">@kvp.Key:</span>
+                                <span class="metric-value">@kvp.Value</span>
+                            </div>
+                        }
+                    }
+                </div>
+            </div>
+        }
+    }
 </div>
 
 @code {
