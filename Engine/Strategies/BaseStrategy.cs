@@ -148,18 +148,18 @@ namespace Engine.Strategies
             decimal beta = marketVariance > 0 ? covariance / marketVariance : 1;
             decimal jensenAlpha = _stratMean - (beta * _marketMean); // Assuming Rf = 0
 
-            decimal stratStdDev = (decimal)Math.Sqrt((double)stratVariance);
+            decimal stratStdDev = stratVariance > 0 ? (decimal)Math.Sqrt((double)stratVariance) : 0;
             decimal sharpeRatio = stratStdDev > 0 ? _stratMean / stratStdDev : 0;
 
             decimal downsideVariance = _covCount > 0 ? _sumSquaredDownside / _covCount : 0;
-            decimal downsideDev = (decimal)Math.Sqrt((double)downsideVariance);
+            decimal downsideDev = downsideVariance > 0 ? (decimal)Math.Sqrt((double)downsideVariance) : 0;
             decimal sortinoRatio = downsideDev > 0 ? _stratMean / downsideDev : 0;
 
             decimal omegaRatio = _sumLosses > 0 ? _sumGains / _sumLosses : 999;
             decimal calmarRatio = _maxDrawdown > 0 ? (pnlPercent / 100m) / (_maxDrawdown / 100m) : 999;
 
             decimal trackingVariance = _covCount > 1 ? _activeM2 / (_covCount - 1) : 0;
-            decimal trackingError = (decimal)Math.Sqrt((double)trackingVariance);
+            decimal trackingError = trackingVariance > 0 ? (decimal)Math.Sqrt((double)trackingVariance) : 0;
             decimal informationRatio = trackingError > 0 ? _activeMean / trackingError : 0;
 
             // Retained Core Stats
