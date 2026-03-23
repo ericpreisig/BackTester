@@ -1,6 +1,8 @@
+using BackTester.Indicators;
 using BackTester.Strategies;
 using Engine.Charts;
 using Engine.Core;
+using Engine.Strategies;
 using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
@@ -18,7 +20,7 @@ namespace BackTester.Controllers
             {
                 HistoryFrom = new DateTime(2017, 01, 01),
                 DateFrom = new DateTime(2018, 01, 01),
-                Strategy = new BtcSystemStrategy(1000),
+                Strategy = new DefaultStrategy(new PeltBicIndicator()),
                 Symbol = new Symbol("BTC-USD")
             };
 

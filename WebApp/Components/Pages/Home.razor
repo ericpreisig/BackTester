@@ -1,0 +1,278 @@
+@page "/"
+@using BackTester.Strategies
+@using Engine.Charts
+@using Engine.Charts.Plots
+@using Engine.Charts.Plots.Candle
+@using Engine.Charts.Plots.Line
+@using Engine.Charts.Plots.Area
+@using Engine.Core
+@using Engine.Strategies
+@using Engine.Indicators
+@using LightweightCharts.Blazor.Charts
+@using LightweightCharts.Blazor.Customization.Enums
+@using LightweightCharts.Blazor.Customization.Series
+@using LightweightCharts.Blazor.Customization.Chart
+@using LightweightCharts.Blazor.DataItems
+@using LightweightCharts.Blazor.Models
+@inject IJSRuntime JS
+@rendermode InteractiveServer
+
+<PageTitle>Home</PageTitle>
+
+<h1>Dashboard</h1>
+
+<style>
+    body {
+        background-color: #131722;
+        color: #d1d4dc;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    .chart-container {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        padding: 20px;
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    .main-chart {
+        height: 60vh;
+        border: 1px solid #2B2B43;
+        border-radius: 8px;
+        overflow: hidden;
+        background-color: #1E222D;
+    }
+    .sub-chart {
+        height: 30vh;
+        border: 1px solid #2B2B43;
+        border-radius: 8px;
+        overflow: hidden;
+        background-color: #1E222D;
+    }
+</style>
+
+<div class="chart-container">
+    <div class="main-chart">
+        <ChartComponent @ref="_mainChart" />
+    </div>
+
+    @if (_chartDatas != null)
+    {
+        @for (var i = 0; i < _underChartCount; i++)
+        {
+            var currentIndex = i;
+            <div class="sub-chart">
+                <ChartComponent @ref="_underCharts[currentIndex]" />
+            </div>
+        }
+    }
+</div>
+
+@code {
+    private ChartComponent _mainChart = default!; 
+    private int _underChartCount = 0;
+    private ChartComponent[] _underCharts = Array.Empty<ChartComponent>();
+    private IEnumerable<IPlotSerie<IPlot, ISerieConfig>>? _chartDatas;
+    private bool _chartsInitialized;
+    private bool _isSyncing = false;
+
+    private async void SyncLogicalRange(object? sender, LogicalRange e)
+    {
+        if (_isSyncing || e == null) return;
+        _isSyncing = true;
+        try
+        {
+            if (_mainChart != null) 
+            {
+                var ts = await _mainChart.TimeScale();
+                await ts.SetVisibleLogicalRange(e);
+            }
+            foreach (var c in _underCharts)
+            {
+                if (c != null) 
+                {
+                    var ts = await c.TimeScale();
+                    await ts.SetVisibleLogicalRange(e);
+                }
+            }
+        }
+        finally
+        {
+            _isSyncing = false;
+        }
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        var chart = new Chart()
+        {
+            HistoryFrom = new DateTime(2017, 01, 01),
+            DateFrom = new DateTime(2018, 01, 01),
+            Strategy = new SmaCrossingStrategy(1000),
+            Symbol = new Symbol("BTC-USD")
+        };
+
+        var context = new Context(chart);
+
+        _chartDatas = await context.ExecuteAsync();
+
+        if (_chartDatas != null)
+        {
+            _underChartCount = _chartDatas.Count(c => c.Postion == Engine.Enums.PlotPositionEnum.UnderChart);
+            _underCharts = new ChartComponent[_underChartCount];
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (_chartDatas != null && !_chartsInitialized)
+        {
+            if (_underChartCount > 0 && _underCharts.Any(c => c == null))
+            {
+                return; 
+            }
+
+            _chartsInitialized = true;
+
+            if (_mainChart != null)
+            {
+                await _mainChart.InitializationCompleted;
+                var tsMain = await _mainChart.TimeScale();
+                tsMain.VisibleLogicalRangeChanged += SyncLogicalRange;
+            }
+
+            foreach (var c in _underCharts)
+            {
+                if (c != null)
+                {
+                    await c.InitializationCompleted;
+                    var ts = await c.TimeScale();
+                    ts.VisibleLogicalRangeChanged += SyncLogicalRange;
+                }
+            }
+
+            int currentUnderChartIndex = 0;
+
+            foreach (var chartData in _chartDatas)
+            {
+                var targetChart = _mainChart;
+
+                if (chartData.Postion == Engine.Enums.PlotPositionEnum.Hidden) continue;
+
+                if (chartData.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
+                {
+                    if (currentUnderChartIndex < _underCharts.Length)
+                    {
+                        targetChart = _underCharts[currentUnderChartIndex++];
+                    }
+                }
+
+                if (targetChart == null) continue;
+
+                switch (chartData.Type)
+                {
+                    case Engine.Enums.PlotTypeEnum.Line:
+                        if (chartData is IPlotSerie<PlotLine, PlotLineSerieConfig> lineData)
+                            await SetLineSerieAsync(targetChart, lineData);
+                        break;
+                    case Engine.Enums.PlotTypeEnum.Candle:
+                        if (chartData is IPlotSerie<PlotCandle, PlotCandleSerieConfig> candleData)
+                            await SetCandleSticksSerieAsync(targetChart, candleData);
+                        break;
+                    case Engine.Enums.PlotTypeEnum.Area:
+                        if (chartData is IPlotSerie<PlotArea, AreaSerieConfig> areaData)
+                            await SetAreaSerieAsync(targetChart, areaData);
+                        break;
+                }
+            }
+        }
+    }
+
+    private async Task ApplyDarkModeOptions(ChartComponent chart)
+    {
+        if (chart == null) return;
+
+        var options = new ChartOptions
+        {
+            Layout = new LayoutOptions
+            {
+                TextColor = System.Drawing.ColorTranslator.FromHtml("#d1d4dc"),
+            },
+            Grid = new GridOptions
+            {
+            },
+            TimeScale = new TimeScaleOptions
+            {
+                TimeVisible = true,
+                RightOffset = 5
+            }
+        };
+
+        try
+        {
+            await chart.ApplyOptions(options);
+        }
+        catch { }
+    }
+
+    private async Task SetLineSerieAsync(ChartComponent chart, IPlotSerie<PlotLine, PlotLineSerieConfig> chartData)
+    {
+        if (chartData == null) return;
+        await ApplyDarkModeOptions(chart);
+        var series = await chart.AddSeries<LineStyleOptions>(SeriesType.Line, new LineStyleOptions()
+        {
+            Color = System.Drawing.ColorTranslator.FromHtml(chartData.Config.Color)
+        });
+        var i = 1;
+        var data = chartData.Plots.Select(a => new LineData<long>()
+        {
+            Time = new DateTimeOffset(a.Time).ToUnixTimeSeconds(),
+            Value = (double)a.Value + i++
+        });
+
+        await series.SetData(data);
+    }
+
+    private async Task SetCandleSticksSerieAsync(ChartComponent chart, IPlotSerie<PlotCandle, PlotCandleSerieConfig> chartData)
+    {
+        if (chartData == null) return;
+        await ApplyDarkModeOptions(chart);
+        var series = await chart.AddSeries<CandlestickStyleOptions>(SeriesType.Candlestick, new CandlestickStyleOptions()
+        {
+            UpColor = System.Drawing.ColorTranslator.FromHtml(chartData.Config.UpColor),
+            DownColor = System.Drawing.ColorTranslator.FromHtml(chartData.Config.DownColor),
+            BorderVisible = chartData.Config.BorderVisible,
+            WickDownColor = System.Drawing.ColorTranslator.FromHtml(chartData.Config.WickDownColor),
+            WickUpColor = System.Drawing.ColorTranslator.FromHtml(chartData.Config.WickUpColor),
+        });
+
+        var data = chartData.Plots.Select(a => new CandlestickData<long>()
+        {
+            Time = new DateTimeOffset(a.Time).ToUnixTimeSeconds(),
+            Close = (double)a.Close,
+            High = (double)a.High,
+            Low = (double)a.Low,
+            Open = (double)a.Open,
+        });
+
+        await series.SetData(data);
+    }
+
+    private async Task SetAreaSerieAsync(ChartComponent chart, IPlotSerie<PlotArea, AreaSerieConfig> chartData)
+    {
+        if (chartData == null) return;
+        await ApplyDarkModeOptions(chart);
+        var series = await chart.AddSeries<AreaStyleOptions>(SeriesType.Area, new AreaStyleOptions()
+        {
+            BaseLineColor = System.Drawing.ColorTranslator.FromHtml(chartData.Config.Color)
+        });
+
+        var data = chartData.Plots.Select(a => new AreaData<long>()
+        {
+            Time = new DateTimeOffset(a.Time).ToUnixTimeSeconds(),
+            Value = (double)a.Value
+        });
+
+        await series.SetData(data);
+    }
+}
