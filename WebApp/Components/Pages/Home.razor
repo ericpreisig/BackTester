@@ -118,7 +118,12 @@
 
         if (_chartDatas != null)
         {
-            _underChartCount = _chartDatas.Count(c => c.Postion == Engine.Enums.PlotPositionEnum.UnderChart);
+            var underChartGroups = _chartDatas
+                .Where(c => c.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
+                .GroupBy(c => c.ChartName)
+                .ToList();
+
+            _underChartCount = underChartGroups.Count;
             _underCharts = new ChartComponent[_underChartCount];
         }
     }
@@ -151,7 +156,17 @@
                 }
             }
 
+            var underChartGroups = _chartDatas
+                .Where(c => c.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
+                .GroupBy(c => c.ChartName)
+                .ToList();
+
+            var chartMap = new Dictionary<string, ChartComponent>();
             int currentUnderChartIndex = 0;
+            foreach (var group in underChartGroups)
+            {
+                chartMap[group.Key] = _underCharts[currentUnderChartIndex++];
+            }
 
             foreach (var chartData in _chartDatas)
             {
@@ -161,10 +176,7 @@
 
                 if (chartData.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
                 {
-                    if (currentUnderChartIndex < _underCharts.Length)
-                    {
-                        targetChart = _underCharts[currentUnderChartIndex++];
-                    }
+                    targetChart = chartMap[chartData.ChartName];
                 }
 
                 if (targetChart == null) continue;
@@ -222,7 +234,8 @@
         var color = string.IsNullOrEmpty(chartData.Config.Color) ? "#2962FF" : chartData.Config.Color;
         var series = await chart.AddSeries<LineStyleOptions>(SeriesType.Line, new LineStyleOptions()
         {
-            Color = System.Drawing.ColorTranslator.FromHtml(color)
+            Color = System.Drawing.ColorTranslator.FromHtml(color),
+            Title = string.IsNullOrEmpty(chartData.Name) ? chartData.ChartName : chartData.Name
         });
         var data = chartData.Plots.Select(a => new LineData<long>()
         {
@@ -249,6 +262,7 @@
             BorderVisible = chartData.Config.BorderVisible,
             WickDownColor = System.Drawing.ColorTranslator.FromHtml(wickDownColor),
             WickUpColor = System.Drawing.ColorTranslator.FromHtml(wickUpColor),
+            Title = string.IsNullOrEmpty(chartData.Name) ? chartData.ChartName : chartData.Name
         });
 
         var data = chartData.Plots.Select(a => new CandlestickData<long>()
@@ -270,7 +284,8 @@
         var color = string.IsNullOrEmpty(chartData.Config.Color) ? "#2962FF" : chartData.Config.Color;
         var series = await chart.AddSeries<AreaStyleOptions>(SeriesType.Area, new AreaStyleOptions()
         {
-            BaseLineColor = System.Drawing.ColorTranslator.FromHtml(color)
+            BaseLineColor = System.Drawing.ColorTranslator.FromHtml(color),
+            Title = string.IsNullOrEmpty(chartData.Name) ? chartData.ChartName : chartData.Name
         });
 
         var data = chartData.Plots.Select(a => new AreaData<long>()
