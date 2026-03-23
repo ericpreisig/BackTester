@@ -1,4 +1,6 @@
 ﻿using Engine.Brokers;
+using System.Collections.Immutable;
+using System.Runtime.InteropServices.Marshalling;
 
 namespace Engine.Charts
 {
@@ -20,7 +22,8 @@ namespace Engine.Charts
 
         public async Task LoadAsync(DateTime from, DateTime to)
         {
-            _candles = await _broker.GetDataFeedAsync(_code, Interval, from, to);
+            var allCandles = await _broker.GetDataFeedAsync(_code, Interval, from, to);
+            _candles = allCandles.Where(a => a.Close > 0).ToList();
         }
 
         public void OnAfterLoad(EventArgs e)
