@@ -11,6 +11,7 @@
 @using LightweightCharts.Blazor.Charts
 @using LightweightCharts.Blazor.Customization.Enums
 @using LightweightCharts.Blazor.Customization.Series
+@using LightweightCharts.Blazor.Series
 @using LightweightCharts.Blazor.Customization.Chart
 @using LightweightCharts.Blazor.DataItems
 @using LightweightCharts.Blazor.Models
@@ -142,6 +143,9 @@
     private bool _chartsInitialized;
     private bool _isSyncing = false;
     private Dictionary<string, Dictionary<string, string>> _chartMetrics = new();
+    private Dictionary<string, ChartComponent> _underChartMap = new();
+    private Dictionary<string, ISeriesApi<long>> _primarySeriesMap = new();
+    private bool _isSyncingCrosshair = false;
 
     private async void SyncLogicalRange(object? sender, LogicalRange e)
     {
@@ -229,43 +233,50 @@
                 .GroupBy(c => c.ChartName)
                 .ToList();
 
-            var chartMap = new Dictionary<string, ChartComponent>();
             int currentUnderChartIndex = 0;
             foreach (var group in underChartGroups)
             {
                 var chartName = group.Key;
                 var c = _underCharts[currentUnderChartIndex++];
-                chartMap[chartName] = c;
+                _underChartMap[chartName] = c;
                 c.CrosshairMoved += (sender, e) => OnCrosshairMoved(chartName, e);
             }
 
             foreach (var chartData in _chartDatas)
             {
                 var targetChart = _mainChart;
+                var mapKey = "Main";
 
                 if (chartData.Postion == Engine.Enums.PlotPositionEnum.Hidden) continue;
 
                 if (chartData.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
                 {
-                    targetChart = chartMap[chartData.ChartName];
+                    targetChart = _underChartMap[chartData.ChartName];
+                    mapKey = chartData.ChartName;
                 }
 
                 if (targetChart == null) continue;
 
+                ISeriesApi<long> series = null;
                 switch (chartData.Type)
                 {
                     case Engine.Enums.PlotTypeEnum.Line:
                         if (chartData is IPlotSerie<PlotLine, PlotLineSerieConfig> lineData)
-                            await SetLineSerieAsync(targetChart, lineData);
+                            series = (ISeriesApi<long>) await SetLineSerieAsync(targetChart, lineData);
                         break;
                     case Engine.Enums.PlotTypeEnum.Candle:
                         if (chartData is IPlotSerie<PlotCandle, PlotCandleSerieConfig> candleData)
-                            await SetCandleSticksSerieAsync(targetChart, candleData);
+                            series = (ISeriesApi<long>) await SetCandleSticksSerieAsync(targetChart, candleData);
                         break;
                     case Engine.Enums.PlotTypeEnum.Area:
                         if (chartData is IPlotSerie<PlotArea, AreaSerieConfig> areaData)
-                            await SetAreaSerieAsync(targetChart, areaData);
+                            series = (ISeriesApi<long>) await SetAreaSerieAsync(targetChart, areaData);
                         break;
+                }
+
+                if (series != null && !_primarySeriesMap.ContainsKey(mapKey))
+                {
+                    _primarySeriesMap[mapKey] = series;
                 }
             }
 
@@ -278,9 +289,56 @@
         }
     }
 
-    private void OnCrosshairMoved(string chartName, MouseEventParams<long> e)
+    private async void OnCrosshairMoved(string chartName, MouseEventParams<long> e)
     {
         UpdateMetrics(chartName, e.Time);
+
+        if (_isSyncingCrosshair) return;
+        _isSyncingCrosshair = true;
+        try
+        {
+            var underGroups = _chartDatas?.Where(c => c.Postion == Engine.Enums.PlotPositionEnum.UnderChart).GroupBy(c => c.ChartName).Select(g => g.Key).ToList() ?? new List<string>();
+
+            if (e.Time.HasValue)
+            {
+                var targetTime = e.Time.Value;
+                
+                if (chartName != "Main" && _mainChart != null)
+                {
+                    if (_primarySeriesMap.TryGetValue("Main", out var serieMain))
+                    {
+                        await _mainChart.SetCrosshairPosition(0, targetTime, serieMain);
+                    }
+                }
+                
+                foreach (var targetChartName in underGroups)
+                {
+                    if (targetChartName != chartName && _underChartMap.TryGetValue(targetChartName, out var chartComp))
+                    {
+                        if (_primarySeriesMap.TryGetValue(targetChartName, out var targetSerie))
+                        {
+                            await chartComp.SetCrosshairPosition(0, targetTime, targetSerie);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                if (chartName != "Main" && _mainChart != null) await _mainChart.ClearCrosshairPosition();
+                foreach (var targetChartName in underGroups)
+                {
+                    if (targetChartName != chartName && _underChartMap.TryGetValue(targetChartName, out var chartComp))
+                    {
+                        await chartComp.ClearCrosshairPosition();
+                    }
+                }
+            }
+        }
+        catch { }
+        finally
+        {
+            _isSyncingCrosshair = false;
+        }
     }
 
     private void UpdateMetrics(string chartName, long? unixTime)
@@ -335,6 +393,7 @@
 
         var options = new ChartOptions
         {
+            AutoSize = true,
             Layout = new LayoutOptions
             {
                 TextColor = System.Drawing.ColorTranslator.FromHtml("#d1d4dc"),
@@ -380,9 +439,9 @@
         };
     }
 
-    private async Task SetLineSerieAsync(ChartComponent chart, IPlotSerie<PlotLine, PlotLineSerieConfig> chartData)
+    private async Task<ISeriesApi<long>> SetLineSerieAsync(ChartComponent chart, IPlotSerie<PlotLine, PlotLineSerieConfig> chartData)
     {
-        if (chartData == null) return;
+        if (chartData == null) return null;
         await ApplyDarkModeOptions(chart);
         var color = string.IsNullOrEmpty(chartData.Config.Color) ? "#2962FF" : chartData.Config.Color;
         var series = await chart.AddSeries<LineStyleOptions>(SeriesType.Line, new LineStyleOptions()
@@ -411,11 +470,12 @@
             });
             await series.CreateSeriesMarkers(markers);
         }
+        return series;
     }
 
-    private async Task SetCandleSticksSerieAsync(ChartComponent chart, IPlotSerie<PlotCandle, PlotCandleSerieConfig> chartData)
+    private async Task<ISeriesApi<long>> SetCandleSticksSerieAsync(ChartComponent chart, IPlotSerie<PlotCandle, PlotCandleSerieConfig> chartData)
     {
-        if (chartData == null) return;
+        if (chartData == null) return null;
         await ApplyDarkModeOptions(chart);
         var upColor = string.IsNullOrEmpty(chartData.Config.UpColor) ? "#26a69a" : chartData.Config.UpColor;
         var downColor = string.IsNullOrEmpty(chartData.Config.DownColor) ? "#ef5350" : chartData.Config.DownColor;
@@ -456,11 +516,12 @@
             });
             await series.CreateSeriesMarkers(markers);
         }
+        return series;
     }
 
-    private async Task SetAreaSerieAsync(ChartComponent chart, IPlotSerie<PlotArea, AreaSerieConfig> chartData)
+    private async Task<ISeriesApi<long>> SetAreaSerieAsync(ChartComponent chart, IPlotSerie<PlotArea, AreaSerieConfig> chartData)
     {
-        if (chartData == null) return;
+        if (chartData == null) return null;
         await ApplyDarkModeOptions(chart);
         var color = string.IsNullOrEmpty(chartData.Config.Color) ? "#2962FF" : chartData.Config.Color;
         var series = await chart.AddSeries<AreaStyleOptions>(SeriesType.Area, new AreaStyleOptions()
@@ -490,5 +551,6 @@
             });
             await series.CreateSeriesMarkers(markers);
         }
+        return series;
     }
 }
