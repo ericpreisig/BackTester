@@ -305,6 +305,7 @@
                 
                 if (chartName != "Main" && _mainChart != null)
                 {
+                    UpdateMetrics("Main", targetTime);
                     if (_primarySeriesMap.TryGetValue("Main", out var serieMain))
                     {
                         await _mainChart.SetCrosshairPosition(0, targetTime, serieMain);
@@ -315,6 +316,7 @@
                 {
                     if (targetChartName != chartName && _underChartMap.TryGetValue(targetChartName, out var chartComp))
                     {
+                        UpdateMetrics(targetChartName, targetTime);
                         if (_primarySeriesMap.TryGetValue(targetChartName, out var targetSerie))
                         {
                             await chartComp.SetCrosshairPosition(0, targetTime, targetSerie);
@@ -324,11 +326,16 @@
             }
             else
             {
-                if (chartName != "Main" && _mainChart != null) await _mainChart.ClearCrosshairPosition();
+                if (chartName != "Main" && _mainChart != null) 
+                {
+                    UpdateMetrics("Main", null);
+                    await _mainChart.ClearCrosshairPosition();
+                }
                 foreach (var targetChartName in underGroups)
                 {
                     if (targetChartName != chartName && _underChartMap.TryGetValue(targetChartName, out var chartComp))
                     {
+                        UpdateMetrics(targetChartName, null);
                         await chartComp.ClearCrosshairPosition();
                     }
                 }
