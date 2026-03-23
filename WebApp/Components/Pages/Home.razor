@@ -219,15 +219,15 @@
     {
         if (chartData == null) return;
         await ApplyDarkModeOptions(chart);
+        var color = string.IsNullOrEmpty(chartData.Config.Color) ? "#2962FF" : chartData.Config.Color;
         var series = await chart.AddSeries<LineStyleOptions>(SeriesType.Line, new LineStyleOptions()
         {
-            Color = System.Drawing.ColorTranslator.FromHtml(chartData.Config.Color)
+            Color = System.Drawing.ColorTranslator.FromHtml(color)
         });
-        var i = 1;
         var data = chartData.Plots.Select(a => new LineData<long>()
         {
             Time = new DateTimeOffset(a.Time).ToUnixTimeSeconds(),
-            Value = (double)a.Value + i++
+            Value = (double)a.Value
         });
 
         await series.SetData(data);
@@ -237,13 +237,18 @@
     {
         if (chartData == null) return;
         await ApplyDarkModeOptions(chart);
+        var upColor = string.IsNullOrEmpty(chartData.Config.UpColor) ? "#26a69a" : chartData.Config.UpColor;
+        var downColor = string.IsNullOrEmpty(chartData.Config.DownColor) ? "#ef5350" : chartData.Config.DownColor;
+        var wickUpColor = string.IsNullOrEmpty(chartData.Config.WickUpColor) ? "#26a69a" : chartData.Config.WickUpColor;
+        var wickDownColor = string.IsNullOrEmpty(chartData.Config.WickDownColor) ? "#ef5350" : chartData.Config.WickDownColor;
+
         var series = await chart.AddSeries<CandlestickStyleOptions>(SeriesType.Candlestick, new CandlestickStyleOptions()
         {
-            UpColor = System.Drawing.ColorTranslator.FromHtml(chartData.Config.UpColor),
-            DownColor = System.Drawing.ColorTranslator.FromHtml(chartData.Config.DownColor),
+            UpColor = System.Drawing.ColorTranslator.FromHtml(upColor),
+            DownColor = System.Drawing.ColorTranslator.FromHtml(downColor),
             BorderVisible = chartData.Config.BorderVisible,
-            WickDownColor = System.Drawing.ColorTranslator.FromHtml(chartData.Config.WickDownColor),
-            WickUpColor = System.Drawing.ColorTranslator.FromHtml(chartData.Config.WickUpColor),
+            WickDownColor = System.Drawing.ColorTranslator.FromHtml(wickDownColor),
+            WickUpColor = System.Drawing.ColorTranslator.FromHtml(wickUpColor),
         });
 
         var data = chartData.Plots.Select(a => new CandlestickData<long>()
@@ -262,9 +267,10 @@
     {
         if (chartData == null) return;
         await ApplyDarkModeOptions(chart);
+        var color = string.IsNullOrEmpty(chartData.Config.Color) ? "#2962FF" : chartData.Config.Color;
         var series = await chart.AddSeries<AreaStyleOptions>(SeriesType.Area, new AreaStyleOptions()
         {
-            BaseLineColor = System.Drawing.ColorTranslator.FromHtml(chartData.Config.Color)
+            BaseLineColor = System.Drawing.ColorTranslator.FromHtml(color)
         });
 
         var data = chartData.Plots.Select(a => new AreaData<long>()
