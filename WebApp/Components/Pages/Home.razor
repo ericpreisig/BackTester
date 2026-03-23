@@ -227,6 +227,30 @@
         catch { }
     }
 
+
+    private SeriesMarkerBarPosition MapMarkerPosition(Engine.Charts.Plots.MarkerPosition pos)
+    {
+        return pos switch
+        {
+            Engine.Charts.Plots.MarkerPosition.AboveBar => SeriesMarkerBarPosition.AboveBar,
+            Engine.Charts.Plots.MarkerPosition.BelowBar => SeriesMarkerBarPosition.BelowBar,
+            Engine.Charts.Plots.MarkerPosition.InBar => SeriesMarkerBarPosition.InBar,
+            _ => SeriesMarkerBarPosition.AboveBar
+        };
+    }
+
+    private SeriesMarkerShape MapMarkerShape(Engine.Charts.Plots.MarkerShape shape)
+    {
+        return shape switch
+        {
+            Engine.Charts.Plots.MarkerShape.Circle => SeriesMarkerShape.Circle,
+            Engine.Charts.Plots.MarkerShape.ArrowUp => SeriesMarkerShape.ArrowUp,
+            Engine.Charts.Plots.MarkerShape.ArrowDown => SeriesMarkerShape.ArrowDown,
+            Engine.Charts.Plots.MarkerShape.Square => SeriesMarkerShape.Square,
+            _ => SeriesMarkerShape.Circle
+        };
+    }
+
     private async Task SetLineSerieAsync(ChartComponent chart, IPlotSerie<PlotLine, PlotLineSerieConfig> chartData)
     {
         if (chartData == null) return;
@@ -244,6 +268,20 @@
         });
 
         await series.SetData(data);
+
+        if (chartData.Markers != null && chartData.Markers.Any())
+        {
+            var markers = chartData.Markers.Select(m => new SeriesMarkerBar<long>()
+            {
+                Time = new DateTimeOffset(m.Time).ToUnixTimeSeconds(),
+                Position = MapMarkerPosition(m.Position),
+                Shape = MapMarkerShape(m.Shape),
+                Color = System.Drawing.ColorTranslator.FromHtml(string.IsNullOrEmpty(m.Color) ? "#26a69a" : m.Color),
+                Text = m.Text ?? "",
+                Size = 1
+            });
+            await series.CreateSeriesMarkers(markers);
+        }
     }
 
     private async Task SetCandleSticksSerieAsync(ChartComponent chart, IPlotSerie<PlotCandle, PlotCandleSerieConfig> chartData)
@@ -275,6 +313,20 @@
         });
 
         await series.SetData(data);
+
+        if (chartData.Markers != null && chartData.Markers.Any())
+        {
+            var markers = chartData.Markers.Select(m => new SeriesMarkerBar<long>()
+            {
+                Time = new DateTimeOffset(m.Time).ToUnixTimeSeconds(),
+                Position = MapMarkerPosition(m.Position),
+                Shape = MapMarkerShape(m.Shape),
+                Color = System.Drawing.ColorTranslator.FromHtml(string.IsNullOrEmpty(m.Color) ? "#26a69a" : m.Color),
+                Text = m.Text ?? "",
+                Size = 1
+            });
+            await series.CreateSeriesMarkers(markers);
+        }
     }
 
     private async Task SetAreaSerieAsync(ChartComponent chart, IPlotSerie<PlotArea, AreaSerieConfig> chartData)
@@ -295,5 +347,19 @@
         });
 
         await series.SetData(data);
+
+        if (chartData.Markers != null && chartData.Markers.Any())
+        {
+            var markers = chartData.Markers.Select(m => new SeriesMarkerBar<long>()
+            {
+                Time = new DateTimeOffset(m.Time).ToUnixTimeSeconds(),
+                Position = MapMarkerPosition(m.Position),
+                Shape = MapMarkerShape(m.Shape),
+                Color = System.Drawing.ColorTranslator.FromHtml(string.IsNullOrEmpty(m.Color) ? "#26a69a" : m.Color),
+                Text = m.Text ?? "",
+                Size = 1
+            });
+            await series.CreateSeriesMarkers(markers);
+        }
     }
 }
