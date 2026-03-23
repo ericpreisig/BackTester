@@ -102,6 +102,21 @@
         color: #2962FF;
         border-bottom: 2px solid #2962FF;
     }
+    .sticky-portfolio {
+        position: sticky;
+        bottom: 0px;
+        z-index: 50;
+        background-color: #131722;
+        padding-top: 15px;
+        padding-bottom: 15px;
+        margin-left: -20px;
+        margin-right: -20px;
+        padding-left: 20px;
+        padding-right: 20px;
+        border-top: 2px solid #2B2B43;
+        box-shadow: 0 -10px 20px rgba(0,0,0,0.5);
+        height:300px;
+    }
 </style>
 
 <div class="chart-container">
@@ -143,13 +158,15 @@
         var underChartGroups = _chartDatas
             .Where(c => c.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
             .GroupBy(c => c.ChartName)
+            .OrderBy(g => g.Key == "Portfolio" ? 1 : 0).ThenBy(g => g.Key)
             .ToList();
 
         @for (var i = 0; i < _underChartCount; i++)
         {
             var currentIndex = i;
             var groupName = underChartGroups.ElementAtOrDefault(currentIndex)?.Key ?? "Under";
-            <div class="chart-wrapper">
+            var isStickyClass = groupName == "Portfolio" ? "sticky-portfolio" : "";
+            <div class="chart-wrapper @isStickyClass">
                 <div class="sub-chart" @key="_chartKey">
                     <ChartComponent @ref="_underCharts[currentIndex]" />
                 </div>
@@ -187,6 +204,7 @@
     private Chart _chart;
     private IStrategy _liveStrategy;
     private CancellationTokenSource? _debounceCts;
+    private LogicalRange? _lastKnownRange = null;
 
     private async Task HandleInputChanged(PropertyInfo prop, IIndicator indicator, ChangeEventArgs e)
     {
@@ -312,6 +330,17 @@
     private async Task ReloadChart()
     {
         _chartsInitialized = false;
+        
+        if (_mainChart != null)
+        {
+            try
+            {
+                var ts = await _mainChart.TimeScale();
+                _lastKnownRange = await ts.GetVisibleLogicalRange();
+            }
+            catch { }
+        }
+        
         _chartKey++;
 
         var newStrategy = (IStrategy)Activator.CreateInstance(_liveStrategy.GetType(), 1000m);
@@ -341,6 +370,7 @@
             var underChartGroups = _chartDatas
                 .Where(c => c.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
                 .GroupBy(c => c.ChartName)
+                .OrderBy(g => g.Key == "Portfolio" ? 1 : 0).ThenBy(g => g.Key)
                 .ToList();
 
             _underChartCount = underChartGroups.Count;
@@ -351,6 +381,8 @@
 
     private async void SyncLogicalRange(object? sender, LogicalRange e)
     {
+        if (e != null) _lastKnownRange = e;
+
         if (_isSyncing || e == null) return;
         _isSyncing = true;
         try
@@ -395,6 +427,7 @@
             var underChartGroups = _chartDatas
                 .Where(c => c.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
                 .GroupBy(c => c.ChartName)
+                .OrderBy(g => g.Key == "Portfolio" ? 1 : 0).ThenBy(g => g.Key)
                 .ToList();
 
             _underChartCount = underChartGroups.Count;
@@ -412,12 +445,12 @@
             }
 
             _chartsInitialized = true;
+            
+            var savedRange = _lastKnownRange; // Stash it securely before SetData triggers auto-scaling overwrites
 
             if (_mainChart != null)
             {
                 await _mainChart.InitializationCompleted;
-                var tsMain = await _mainChart.TimeScale();
-                tsMain.VisibleLogicalRangeChanged += SyncLogicalRange;
                 _mainChart.CrosshairMoved += (sender, e) => OnCrosshairMoved("Main", e);
             }
 
@@ -426,14 +459,13 @@
                 if (c != null)
                 {
                     await c.InitializationCompleted;
-                    var ts = await c.TimeScale();
-                    ts.VisibleLogicalRangeChanged += SyncLogicalRange;
                 }
             }
 
             var underChartGroups = _chartDatas
                 .Where(c => c.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
                 .GroupBy(c => c.ChartName)
+                .OrderBy(g => g.Key == "Portfolio" ? 1 : 0).ThenBy(g => g.Key)
                 .ToList();
 
             int currentUnderChartIndex = 0;
@@ -447,6 +479,7 @@
 
             foreach (var chartData in _chartDatas)
             {
+                await Task.Delay(10);
                 var targetChart = _mainChart;
                 var mapKey = "Main";
 
@@ -481,6 +514,41 @@
                 {
                     _primarySeriesMap[mapKey] = series;
                 }
+            }
+
+            // Restore Logical Range AND Hook Sync Events after initialization auto-scaling completes
+            if (_mainChart != null)
+            {
+                try
+                {
+                    var tsMain = await _mainChart.TimeScale();
+                    if (savedRange != null)
+                    {
+                        await tsMain.SetVisibleLogicalRange(savedRange);
+                    }
+                    tsMain.VisibleLogicalRangeChanged += SyncLogicalRange;
+                } catch { }
+            }
+
+            foreach (var c in _underCharts)
+            {
+                if (c != null)
+                {
+                    try
+                    {
+                        var ts = await c.TimeScale();
+                        if (savedRange != null)
+                        {
+                            await ts.SetVisibleLogicalRange(savedRange);
+                        }
+                        ts.VisibleLogicalRangeChanged += SyncLogicalRange;
+                    } catch { }
+                }
+            }
+
+            if (savedRange != null)
+            {
+                _lastKnownRange = savedRange; // Restore truth
             }
 
             UpdateMetrics("Main", null);

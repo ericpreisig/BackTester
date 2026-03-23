@@ -10,6 +10,7 @@ namespace BackTester.Strategies
     {
         private SmaIndicator _slow;
         private SmaIndicator _fast;
+        private SmaIndicator _mid;
 
         public SmaCrossingStrategy(decimal capital) : base(capital)
         {
@@ -20,8 +21,14 @@ namespace BackTester.Strategies
             Add(_slow = new SmaIndicator(20, Color.Red));
             Add(_fast = new SmaIndicator(100, Color.Blue));
 
+            Add(_mid = new SmaIndicator(50, Color.Yellow));
+
             _slow.AfterLoad += (_, _)=> _slow.Average.Name = "Slow SMA";
             _fast.AfterLoad += (_, _)=> _fast.Average.Name = "Fast SMA";
+            _mid.AfterLoad += (_, _)=> {
+                _mid.Average.Name = "Mid SMA";
+                _mid.Average.Postion = Engine.Enums.PlotPositionEnum.UnderChart;
+            };
         }
 
         public override async Task CandleFinishedAsync(Candle candle)
