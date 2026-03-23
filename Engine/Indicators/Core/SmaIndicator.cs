@@ -11,17 +11,17 @@ namespace Engine.Indicators.Core
         public PlotLineSerie Average;
 
         public int Length { get; set; }
-        public Color Color { get; set; }
+        public Color _color;
 
         public SmaIndicator(int length, Color color = default)
         {
             Length = length;
-            Color = color;
+            _color = color;
         }
 
         public override Task LoadAsync(Symbol symbol) 
         {
-            Add(Average = new PlotLineSerie(nameof(SmaIndicator), PlotPositionEnum.OnChart, new PlotLineSerieConfig(Color)));
+            Add(Average = new PlotLineSerie(nameof(SmaIndicator), PlotPositionEnum.OnChart, new PlotLineSerieConfig(_color)));
             
             return Task.CompletedTask;
         }

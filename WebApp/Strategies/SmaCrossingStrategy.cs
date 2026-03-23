@@ -1,4 +1,4 @@
-﻿using Engine.Charts;
+using Engine.Charts;
 using Engine.Charts.Plots.Line;
 using Engine.Indicators.Core;
 using Engine.Strategies;

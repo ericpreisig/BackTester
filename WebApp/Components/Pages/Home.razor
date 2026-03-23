@@ -16,12 +16,16 @@
 @using LightweightCharts.Blazor.DataItems
 @using LightweightCharts.Blazor.Models
 @using LightweightCharts.Blazor.Models.Events
+@using System.Reflection
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
 <PageTitle>Home</PageTitle>
 
-<h1>Dashboard</h1>
+<div style="display:flex; justify-content:space-between; align-items:center;">
+    <h1>Dashboard</h1>
+    <button @onclick="ReloadChart" style="background:#2962FF; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold;">Réappliquer et Recharger 🔄</button>
+</div>
 
 <style>
     body {
@@ -76,27 +80,60 @@
     .metric-key {
         font-weight: bold;
         color: #B2B5BE;
+        cursor: help;
+        text-decoration: underline dotted;
     }
     .metric-value {
         color: #FFFFFF;
     }
+    .tabs {
+        display: flex;
+        border-bottom: 1px solid #2B2B43;
+        margin-bottom: 10px;
+    }
+    .tab {
+        flex: 1;
+        padding: 5px;
+        text-align: center;
+        cursor: pointer;
+        color: #B2B5BE;
+        font-size: 14px;
+    }
+    .tab.active {
+        color: #2962FF;
+        border-bottom: 2px solid #2962FF;
+    }
 </style>
 
-<div class="chart-container">
+<div class="chart-container" @key="_chartKey">
     <div class="chart-wrapper">
         <div class="main-chart">
             <ChartComponent @ref="_mainChart" />
         </div>
         <div class="chart-metrics">
-            <h4 style="margin-top: 0; color: #fff;">Stats</h4>
-            @if (_chartMetrics.TryGetValue("Main", out var mainMetrics))
+            <div class="tabs">
+                <div class="tab @(_activeTab == "Stats" ? "active" : "")" @onclick="@(() => _activeTab = "Stats")">Stats</div>
+                <div class="tab @(_activeTab == "Settings" ? "active" : "")" @onclick="@(() => _activeTab = "Settings")">Settings</div>
+            </div>
+
+            @if(_activeTab == "Stats")
             {
-                @foreach (var kvp in mainMetrics)
+                @if (_chartMetrics.TryGetValue("Main", out var mainMetrics))
                 {
-                    <div class="metric-item">
-                        <span class="metric-key">@kvp.Key:</span>
-                        <span class="metric-value">@kvp.Value</span>
-                    </div>
+                    @foreach (var kvp in mainMetrics)
+                    {
+                        <div class="metric-item">
+                            <span class="metric-key" title="@GetTooltip(kvp.Key)">@kvp.Key:</span>
+                            <span class="metric-value">@kvp.Value</span>
+                        </div>
+                    }
+                }
+            }
+            else
+            {
+                @if(_liveStrategy != null)
+                {
+                    @RenderIndicatorEditor(_liveStrategy, _liveStrategy.GetType().Name)
                 }
             }
         </div>
@@ -118,13 +155,13 @@
                     <ChartComponent @ref="_underCharts[currentIndex]" />
                 </div>
                 <div class="chart-metrics">
-                    <h4 style="margin-top: 0; color: #fff;">@groupName Stats</h4>
+                    <h4 style="margin-top: 0; color: #fff; padding-bottom: 5px; border-bottom: 1px solid #2B2B43">@groupName Stats</h4>
                     @if (_chartMetrics.TryGetValue(groupName, out var underMetrics))
                     {
                         @foreach (var kvp in underMetrics)
                         {
                             <div class="metric-item">
-                                <span class="metric-key">@kvp.Key:</span>
+                                <span class="metric-key" title="@GetTooltip(kvp.Key)">@kvp.Key:</span>
                                 <span class="metric-value">@kvp.Value</span>
                             </div>
                         }
@@ -136,6 +173,7 @@
 </div>
 
 @code {
+    private string _activeTab = "Stats";
     private ChartComponent _mainChart = default!; 
     private int _underChartCount = 0;
     private ChartComponent[] _underCharts = Array.Empty<ChartComponent>();
@@ -146,6 +184,134 @@
     private Dictionary<string, ChartComponent> _underChartMap = new();
     private Dictionary<string, ISeriesApi<long>> _primarySeriesMap = new();
     private bool _isSyncingCrosshair = false;
+    private int _chartKey = 0;
+    private Chart _chart;
+    private IStrategy _liveStrategy;
+
+    private RenderFragment RenderIndicatorEditor(IIndicator indicator, string name) => __builder =>
+    {
+        if (indicator == null) return;
+
+        <div class="indicator-editor" style="margin-bottom: 15px; border-left: 2px solid #2B2B43; padding-left: 10px;">
+            <h5 style="color: #2962FF; margin-top: 5px; margin-bottom: 10px;">@name</h5>
+            @{
+                var type = indicator.GetType();
+                var props = type.GetProperties(BindingFlags.Public | BindingFlags.Instance)
+                                .Where(p => p.CanRead && p.CanWrite);
+
+                foreach (var prop in props)
+                {
+                    <div class="property-row" style="margin-bottom: 8px; display:flex; justify-content: space-between; align-items: center;">
+                        <span style="color: #B2B5BE; font-size: 13px;">@prop.Name</span>
+                        @{
+                            var val = prop.GetValue(indicator);
+                            if (prop.PropertyType == typeof(int))
+                            {
+                                <input type="number" value="@val" @onchange="@(e => prop.SetValue(indicator, Convert.ToInt32(e.Value)))" style="background: #131722; color: white; border: 1px solid #2B2B43; padding: 2px 5px; width: 60px; border-radius: 3px;" />
+                            }
+                            else if (prop.PropertyType == typeof(decimal))
+                            {
+                                <input type="number" step="0.01" value="@val" @onchange="@(e => prop.SetValue(indicator, Convert.ToDecimal(e.Value)))" style="background: #131722; color: white; border: 1px solid #2B2B43; padding: 2px 5px; width: 60px; border-radius: 3px;" />
+                            }
+                            else if (prop.PropertyType == typeof(System.Drawing.Color))
+                            {
+                                var c = (System.Drawing.Color)val;
+                                var hex = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
+                                <input type="color" value="@hex" @onchange="@(e => { var col = System.Drawing.ColorTranslator.FromHtml(e.Value.ToString()); prop.SetValue(indicator, col); })" style="background: #131722; border: 1px solid #2B2B43;" />
+                            }
+                            else
+                            {
+                                <input type="text" value="@val" @onchange="@(e => prop.SetValue(indicator, Convert.ChangeType(e.Value, prop.PropertyType)))" style="background: #131722; color: white; border: 1px solid #2B2B43; padding: 2px 5px; width: 60px; border-radius: 3px;" />
+                            }
+                        }
+                    </div>
+                }
+
+                int childIndex = 0;
+                foreach (var child in indicator.Indicators)
+                {
+                    @RenderIndicatorEditor(child, child.GetType().Name.Replace("Indicator", "") + " " + (++childIndex))
+                }
+            }
+        </div>
+    };
+
+    private string GetTooltip(string metricName)
+    {
+        return metricName switch
+        {
+            "Sharpe Ratio" => "Mesure le rendement de la stratégie corrigé de son risque total (Volatilité). Plus c'est élevé, meilleur est le profil rendement/risque.",
+            "Sortino Ratio" => "Comme le Sharpe, mais ne pénalise que la volatilité à la baisse (le vrai risque). Un ratio élevé signifie des rendements consistants avec peu de grosses chutes.",
+            "Omega Ratio" => "Ratio de la somme des gains sur la somme des pertes. Évalue l'asymétrie totale d'une stratégie de manière probabiliste.",
+            "Calmar Ratio" => "Rendement total divisé par le Max Drawdown. Mesure la tolérance à la douleur pour atteindre ce rendement.",
+            "Beta (β)" => "Mesure la volatilité systématique (corrélation) de la stratégie par rapport au marché (Buy & Hold). Beta = 1 : Mouvements identiques au marché. Beta < 1 : Plus stable.",
+            "Jensen's Alpha (α)" => "La surperformance (ou sous-performance) pure de la stratégie après déduction du risque marché (Beta). C'est le vrai 'edge' de la stratégie.",
+            "Information Ratio" => "Rendement excédentaire divisé par le Tracking Error. Mesure la régularité mathématique à battre le marché de référence de façon constante.",
+            "Kelly Criterion" => "Algorithme probabiliste suggérant quel pourcentage de capital risquer sur ce signal de trading pour maximiser la croissance à long terme en évitant la ruine.",
+            "Recovery Factor" => "Profit net divisé par la pire chute en argent (Net Profit / Max Drawdown $). Affiche la capacité de survie du fond.",
+            "Profit Factor" => "Gains bruts divisés par les Pertes brutes. Doit être strictement supérieur à 1 pour garantir une profitabilité structurelle.",
+            "Payoff Ratio" => "La taille moyenne d'un trade gagnant divisée par la taille absolue d'un trade perdant.",
+            "Expectancy ($)" => "L'espérance mathématique : ce que la stratégie gagne ou perd 'en moyenne' à chaque transaction exécutée.",
+            _ => "Analyse en temps réel de l'évolution du portefeuille."
+        };
+    }
+
+    private void CopyProperties(IIndicator source, IIndicator target)
+    {
+        var props = source.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanRead && p.CanWrite);
+        foreach(var prop in props)
+        {
+            prop.SetValue(target, prop.GetValue(source));
+        }
+        for(int i = 0; i < source.Indicators.Count; i++)
+        {
+            if (i < target.Indicators.Count)
+            {
+                CopyProperties(source.Indicators[i], target.Indicators[i]);
+            }
+        }
+    }
+
+    private async Task ReloadChart()
+    {
+        _chartsInitialized = false;
+        _chartKey++;
+
+        var newStrategy = (IStrategy)Activator.CreateInstance(_liveStrategy.GetType(), 1000m);
+        
+        var newChart = new Chart()
+        {
+            HistoryFrom = _chart.HistoryFrom,
+            DateFrom = _chart.DateFrom,
+            Strategy = newStrategy,
+            Symbol = new Symbol("BTC-USD")
+        };
+
+        var context = new Context(newChart);
+        await context.PrepareAsync();
+        
+        CopyProperties(_liveStrategy, newChart.Strategy);
+
+        _chartDatas = await context.ExecuteOnlyAsync();
+        _chart = newChart;
+        _liveStrategy = newChart.Strategy;
+        
+        _primarySeriesMap.Clear();
+        _underChartMap.Clear();
+        _chartMetrics.Clear();
+        
+        if (_chartDatas != null)
+        {
+            var underChartGroups = _chartDatas
+                .Where(c => c.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
+                .GroupBy(c => c.ChartName)
+                .ToList();
+
+            _underChartCount = underChartGroups.Count;
+            _underCharts = new ChartComponent[_underChartCount];
+        }
+        StateHasChanged();
+    }
 
     private async void SyncLogicalRange(object? sender, LogicalRange e)
     {
@@ -175,17 +341,18 @@
 
     protected override async Task OnInitializedAsync()
     {
-        var chart = new Chart()
+        _chart = new Chart()
         {
             HistoryFrom = new DateTime(2017, 01, 01),
             DateFrom = new DateTime(2018, 01, 01),
             Strategy = new SmaCrossingStrategy(1000),
             Symbol = new Symbol("BTC-USD")
         };
+        _liveStrategy = _chart.Strategy;
 
-        var context = new Context(chart);
-
-        _chartDatas = await context.ExecuteAsync();
+        var context = new Context(_chart);
+        await context.PrepareAsync();
+        _chartDatas = await context.ExecuteOnlyAsync();
 
         if (_chartDatas != null)
         {

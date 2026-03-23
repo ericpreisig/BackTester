@@ -1,4 +1,4 @@
-﻿using Engine.Charts;
+using Engine.Charts;
 using Engine.Charts.Plots;
 using Engine.Indicators;
 
@@ -12,16 +12,25 @@ namespace Engine.Core
             Chart = chart;
         }
 
-        public async Task<IEnumerable<IPlotSerie<IPlot, ISerieConfig>>> ExecuteAsync()
+        public async Task PrepareAsync()
         {
             await LoadAsync();
+        }
 
+        public async Task<IEnumerable<IPlotSerie<IPlot, ISerieConfig>>> ExecuteOnlyAsync()
+        {
             for (var time = Chart.DateFrom; time < Chart.DateTo; time = time.AddSeconds(Chart.Symbol.Interval.GetSeconds()))
             {
                 await Chart.Strategy.UpdateAsync(Chart.Symbol, time);
             }
 
             return GetPlots(Chart.Strategy);
+        }
+
+        public async Task<IEnumerable<IPlotSerie<IPlot, ISerieConfig>>> ExecuteAsync()
+        {
+            await PrepareAsync();
+            return await ExecuteOnlyAsync();
         }
 
         private async Task LoadAsync()
