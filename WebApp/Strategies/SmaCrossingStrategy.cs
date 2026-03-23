@@ -17,8 +17,8 @@ namespace BackTester.Strategies
 
         public override async Task LoadAsync(Symbol symbol)
         {
-            Add(_slow = new SmaIndicator(new SmaConfig(20, Color.Red)));
-            Add(_fast = new SmaIndicator(new SmaConfig(100, Color.Blue)));
+            Add(_slow = new SmaIndicator(20, Color.Red));
+            Add(_fast = new SmaIndicator(100, Color.Blue));
 
             _slow.AfterLoad += (_, _)=> _slow.Average.Name = "Slow SMA";
             _fast.AfterLoad += (_, _)=> _fast.Average.Name = "Fast SMA";
