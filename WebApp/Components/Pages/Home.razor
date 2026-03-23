@@ -14,6 +14,7 @@
 @using LightweightCharts.Blazor.Customization.Chart
 @using LightweightCharts.Blazor.DataItems
 @using LightweightCharts.Blazor.Models
+@using LightweightCharts.Blazor.Models.Events
 @inject IJSRuntime JS
 @rendermode InteractiveServer
 
@@ -35,7 +36,14 @@
         max-width: 1400px;
         margin: 0 auto;
     }
+    .chart-wrapper {
+        display: flex;
+        flex-direction: row;
+        width: 100%;
+        gap: 15px;
+    }
     .main-chart {
+        flex: 1;
         height: 60vh;
         border: 1px solid #2B2B43;
         border-radius: 8px;
@@ -43,26 +51,84 @@
         background-color: #1E222D;
     }
     .sub-chart {
+        flex: 1;
         height: 30vh;
         border: 1px solid #2B2B43;
         border-radius: 8px;
         overflow: hidden;
         background-color: #1E222D;
     }
+    .chart-metrics {
+        width: 250px;
+        background-color: #1E222D;
+        border: 1px solid #2B2B43;
+        border-radius: 8px;
+        padding: 15px;
+        overflow-y: auto;
+    }
+    .metric-item {
+        margin-bottom: 8px;
+        display: flex;
+        justify-content: space-between;
+        font-size: 14px;
+    }
+    .metric-key {
+        font-weight: bold;
+        color: #B2B5BE;
+    }
+    .metric-value {
+        color: #FFFFFF;
+    }
 </style>
 
 <div class="chart-container">
-    <div class="main-chart">
-        <ChartComponent @ref="_mainChart" />
+    <div class="chart-wrapper">
+        <div class="main-chart">
+            <ChartComponent @ref="_mainChart" />
+        </div>
+        <div class="chart-metrics">
+            <h4 style="margin-top: 0; color: #fff;">Stats</h4>
+            @if (_chartMetrics.TryGetValue("Main", out var mainMetrics))
+            {
+                @foreach (var kvp in mainMetrics)
+                {
+                    <div class="metric-item">
+                        <span class="metric-key">@kvp.Key:</span>
+                        <span class="metric-value">@kvp.Value</span>
+                    </div>
+                }
+            }
+        </div>
     </div>
 
     @if (_chartDatas != null)
     {
+        var underChartGroups = _chartDatas
+            .Where(c => c.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
+            .GroupBy(c => c.ChartName)
+            .ToList();
+
         @for (var i = 0; i < _underChartCount; i++)
         {
             var currentIndex = i;
-            <div class="sub-chart">
-                <ChartComponent @ref="_underCharts[currentIndex]" />
+            var groupName = underChartGroups.ElementAtOrDefault(currentIndex)?.Key ?? "Under";
+            <div class="chart-wrapper">
+                <div class="sub-chart">
+                    <ChartComponent @ref="_underCharts[currentIndex]" />
+                </div>
+                <div class="chart-metrics">
+                    <h4 style="margin-top: 0; color: #fff;">@groupName Stats</h4>
+                    @if (_chartMetrics.TryGetValue(groupName, out var underMetrics))
+                    {
+                        @foreach (var kvp in underMetrics)
+                        {
+                            <div class="metric-item">
+                                <span class="metric-key">@kvp.Key:</span>
+                                <span class="metric-value">@kvp.Value</span>
+                            </div>
+                        }
+                    }
+                </div>
             </div>
         }
     }
@@ -75,6 +141,7 @@
     private IEnumerable<IPlotSerie<IPlot, ISerieConfig>>? _chartDatas;
     private bool _chartsInitialized;
     private bool _isSyncing = false;
+    private Dictionary<string, Dictionary<string, string>> _chartMetrics = new();
 
     private async void SyncLogicalRange(object? sender, LogicalRange e)
     {
@@ -144,6 +211,7 @@
                 await _mainChart.InitializationCompleted;
                 var tsMain = await _mainChart.TimeScale();
                 tsMain.VisibleLogicalRangeChanged += SyncLogicalRange;
+                _mainChart.CrosshairMoved += (sender, e) => OnCrosshairMoved("Main", e);
             }
 
             foreach (var c in _underCharts)
@@ -165,7 +233,10 @@
             int currentUnderChartIndex = 0;
             foreach (var group in underChartGroups)
             {
-                chartMap[group.Key] = _underCharts[currentUnderChartIndex++];
+                var chartName = group.Key;
+                var c = _underCharts[currentUnderChartIndex++];
+                chartMap[chartName] = c;
+                c.CrosshairMoved += (sender, e) => OnCrosshairMoved(chartName, e);
             }
 
             foreach (var chartData in _chartDatas)
@@ -197,7 +268,65 @@
                         break;
                 }
             }
+
+            UpdateMetrics("Main", null);
+            foreach (var group in underChartGroups)
+            {
+                UpdateMetrics(group.Key, null);
+            }
+            StateHasChanged();
         }
+    }
+
+    private void OnCrosshairMoved(string chartName, MouseEventParams<long> e)
+    {
+        UpdateMetrics(chartName, e.Time);
+    }
+
+    private void UpdateMetrics(string chartName, long? unixTime)
+    {
+        if (_chartDatas == null) return;
+        
+        IEnumerable<IPlotSerie<IPlot, ISerieConfig>> series = Enumerable.Empty<IPlotSerie<IPlot, ISerieConfig>>();
+        if (chartName == "Main")
+            series = _chartDatas.Where(c => c.Postion == Engine.Enums.PlotPositionEnum.OnChart);
+        else
+            series = _chartDatas.Where(c => c.ChartName == chartName);
+
+        if (series == null || !series.Any()) return;
+
+        DateTime targetTime;
+        if (unixTime.HasValue) 
+        {
+            targetTime = DateTimeOffset.FromUnixTimeSeconds(unixTime.Value).UtcDateTime;
+        } 
+        else 
+        {
+            var allKeys = series.SelectMany(s => s.Metrics?.Keys ?? Enumerable.Empty<DateTime>()).ToList();
+            targetTime = allKeys.Any() ? allKeys.Max() : DateTime.MinValue;
+            if (targetTime == DateTime.MinValue) return;
+        }
+
+        var combinedMetrics = new Dictionary<string, string>();
+        foreach(var s in series) 
+        {
+            if (s.Metrics == null || !s.Metrics.Any()) continue;
+            var matches = s.Metrics.Keys.Where(k => k <= targetTime);
+            if (matches.Any())
+            {
+                var closestTime = matches.Max();
+                if (s.Metrics.TryGetValue(closestTime, out var dict))
+                {
+                    foreach(var kvp in dict) 
+                    {
+                        combinedMetrics[kvp.Key] = kvp.Value;
+                    }
+                }
+            }
+        }
+
+        _chartMetrics[chartName] = combinedMetrics;
+        InvokeAsync(StateHasChanged);
     }
 
     private async Task ApplyDarkModeOptions(ChartComponent chart)

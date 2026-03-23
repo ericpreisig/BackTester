@@ -1,4 +1,4 @@
-﻿using Engine.Charts.Plots;
+using Engine.Charts.Plots;
 using Engine.Enums;
 
 namespace Engine.Charts.Plots
@@ -14,5 +14,6 @@ namespace Engine.Charts.Plots
         public IEnumerable<T> Plots { get; }
         public IEnumerable<Marker> Markers { get; }
         public U Config { get; }
+        public Dictionary<DateTime, Dictionary<string, string>> Metrics { get; }
     }
 }

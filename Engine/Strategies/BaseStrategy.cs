@@ -1,4 +1,4 @@
-﻿using Engine.Charts;
+using Engine.Charts;
 using Engine.Charts.Plots;
 using Engine.Charts.Plots.Area;
 using Engine.Charts.Plots.Line;
@@ -17,8 +17,13 @@ namespace Engine.Strategies
         private PlotLineSerie _equity;
         private AreaSerie _buyAndHold;
 
+        private decimal _maxEquity = 0;
+        private decimal _maxDrawdown = 0;
+        private decimal _initialCapital = 0;
+
         protected BaseStrategy(decimal capital) : this()
         {
+            _initialCapital = capital;
             Portfolio = new Portfolio(capital);
             _buyAndHoldPortfolio = new Portfolio(capital);
         }
@@ -53,6 +58,25 @@ namespace Engine.Strategies
 
             _equity.Add(new PlotLine(candle.Time, value));
             _buyAndHold.Add(new PlotArea(candle.Time, valueHold));
+
+            // Metric tracking chronologically
+            if (!_equity.Metrics.ContainsKey(candle.Time))
+            {
+                _equity.Metrics[candle.Time] = new Dictionary<string, string>();
+            }
+
+            decimal pnl = value - _initialCapital;
+            decimal pnlPercent = _initialCapital > 0 ? (pnl / _initialCapital) * 100 : 0;
+
+            if (value > _maxEquity) _maxEquity = value;
+            decimal drawdown = _maxEquity > 0 ? ((_maxEquity - value) / _maxEquity) * 100 : 0;
+            if (drawdown > _maxDrawdown) _maxDrawdown = drawdown;
+
+            var metrics = _equity.Metrics[candle.Time];
+            metrics["PNL"] = $"{pnl.ToString("0.00")} ({pnlPercent.ToString("0.00")}%)";
+            metrics["Drawdown"] = drawdown.ToString("0.00") + "%";
+            metrics["Max Drawdown"] = _maxDrawdown.ToString("0.00") + "%";
+            metrics["Trades (Open)"] = Portfolio.Orders.Count.ToString();
         }
 
         public void BuyQuantity(Candle candle, decimal quantity)
