@@ -24,7 +24,6 @@
 
 <div style="display:flex; justify-content:space-between; align-items:center;">
     <h1>Dashboard</h1>
-    <button @onclick="ReloadChart" style="background:#2962FF; color:white; border:none; padding:10px 20px; border-radius:5px; cursor:pointer; font-weight:bold;">Réappliquer et Recharger 🔄</button>
 </div>
 
 <style>
@@ -187,6 +186,44 @@
     private int _chartKey = 0;
     private Chart _chart;
     private IStrategy _liveStrategy;
+    private CancellationTokenSource? _debounceCts;
+
+    private async Task HandleInputChanged(PropertyInfo prop, IIndicator indicator, ChangeEventArgs e)
+    {
+        try
+        {
+            object val;
+            if (prop.PropertyType == typeof(System.Drawing.Color))
+            {
+                val = System.Drawing.ColorTranslator.FromHtml(e.Value?.ToString() ?? "#FFFFFF");
+            }
+            else
+            {
+                val = Convert.ChangeType(e.Value, prop.PropertyType);
+            }
+            prop.SetValue(indicator, val);
+
+            if (_debounceCts != null)
+            {
+                _debounceCts.Cancel();
+                _debounceCts.Dispose();
+            }
+
+            _debounceCts = new CancellationTokenSource();
+            var token = _debounceCts.Token;
+
+            await Task.Delay(500, token);
+            
+            if (!token.IsCancellationRequested)
+            {
+                await ReloadChart();
+            }
+        }
+        catch (Exception)
+        {
+            // Ignore format parsing errors during typing
+        }
+    }
 
     private RenderFragment RenderIndicatorEditor(IIndicator indicator, string name) => __builder =>
     {
@@ -207,21 +244,21 @@
                             var val = prop.GetValue(indicator);
                             if (prop.PropertyType == typeof(int))
                             {
-                                <input type="number" value="@val" @onchange="@(e => prop.SetValue(indicator, Convert.ToInt32(e.Value)))" style="background: #131722; color: white; border: 1px solid #2B2B43; padding: 2px 5px; width: 60px; border-radius: 3px;" />
+                                <input type="number" value="@val" @oninput="@(e => HandleInputChanged(prop, indicator, e))" style="background: #131722; color: white; border: 1px solid #2B2B43; padding: 2px 5px; width: 60px; border-radius: 3px;" />
                             }
                             else if (prop.PropertyType == typeof(decimal))
                             {
-                                <input type="number" step="0.01" value="@val" @onchange="@(e => prop.SetValue(indicator, Convert.ToDecimal(e.Value)))" style="background: #131722; color: white; border: 1px solid #2B2B43; padding: 2px 5px; width: 60px; border-radius: 3px;" />
+                                <input type="number" step="0.01" value="@val" @oninput="@(e => HandleInputChanged(prop, indicator, e))" style="background: #131722; color: white; border: 1px solid #2B2B43; padding: 2px 5px; width: 60px; border-radius: 3px;" />
                             }
                             else if (prop.PropertyType == typeof(System.Drawing.Color))
                             {
                                 var c = (System.Drawing.Color)val;
                                 var hex = $"#{c.R:X2}{c.G:X2}{c.B:X2}";
-                                <input type="color" value="@hex" @onchange="@(e => { var col = System.Drawing.ColorTranslator.FromHtml(e.Value.ToString()); prop.SetValue(indicator, col); })" style="background: #131722; border: 1px solid #2B2B43;" />
+                                <input type="color" value="@hex" @oninput="@(e => HandleInputChanged(prop, indicator, e))" style="background: #131722; border: 1px solid #2B2B43;" />
                             }
                             else
                             {
-                                <input type="text" value="@val" @onchange="@(e => prop.SetValue(indicator, Convert.ChangeType(e.Value, prop.PropertyType)))" style="background: #131722; color: white; border: 1px solid #2B2B43; padding: 2px 5px; width: 60px; border-radius: 3px;" />
+                                <input type="text" value="@val" @oninput="@(e => HandleInputChanged(prop, indicator, e))" style="background: #131722; color: white; border: 1px solid #2B2B43; padding: 2px 5px; width: 60px; border-radius: 3px;" />
                             }
                         }
                     </div>
