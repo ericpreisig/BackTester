@@ -1,0 +1,42 @@
+using Engine.Charts;
+using Engine.Charts.Plots.Line;
+using Engine.Indicators.Core;
+using Engine.Strategies;
+using System.Drawing;
+
+namespace BackTester.Strategies
+{
+    public class Sma2CrossingStrategy : BaseStrategy
+    {
+        private SmaIndicator _slow;
+        private SmaIndicator _fast;
+
+        public Sma2CrossingStrategy(decimal capital) : base(capital)
+        {
+        }
+
+        public override async Task LoadAsync(Symbol symbol)
+        {
+            Add(_slow = new SmaIndicator(20, Color.Red));
+            Add(_fast = new SmaIndicator(100, Color.Blue));
+
+            _slow.AfterLoad += (_, _)=> _slow.Average.Name = "Slow SMA";
+            _fast.AfterLoad += (_, _)=> _fast.Average.Name = "Fast SMA";
+        }
+
+        public override async Task CandleFinishedAsync(Candle candle)
+        {
+            var slowValues = _slow.Average.Plots.TakeLast(2).Select(a => a.Value);
+            var fastValues = _fast.Average.Plots.TakeLast(2).Select(a => a.Value);
+
+            if (slowValues.FirstOrDefault() > fastValues.FirstOrDefault() && slowValues.LastOrDefault() < fastValues.LastOrDefault())
+            {
+                SellFull(candle);
+            }
+            if (slowValues.FirstOrDefault() < fastValues.FirstOrDefault() && slowValues.LastOrDefault() > fastValues.LastOrDefault())
+            {
+                BuyFull(candle);
+            }
+        }
+    }
+}
