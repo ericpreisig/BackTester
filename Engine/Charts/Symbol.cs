@@ -1,5 +1,6 @@
 ﻿using Engine.Brokers;
 using System.Collections.Immutable;
+using System.Linq;
 using System.Runtime.InteropServices.Marshalling;
 
 namespace Engine.Charts
@@ -24,6 +25,9 @@ namespace Engine.Charts
         {
             var allCandles = await _broker.GetDataFeedAsync(_code, Interval, from, to);
             _candles = allCandles.Where(a => a.Close > 0).ToList();
+            _candles = _candles.Take(_candles.Count-1).ToList();
+
+
         }
 
         public void OnAfterLoad(EventArgs e)
