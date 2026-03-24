@@ -32,8 +32,6 @@ public partial class Home : ComponentBase
 
     // Chart components
     private ChartComponent _mainChart = default!;
-    private int _underChartCount;
-    private ChartComponent[] _underCharts = Array.Empty<ChartComponent>();
 
     // Chart data
     private IEnumerable<IPlotSerie<IPlot, ISerieConfig>>? _chartDatas;
@@ -94,31 +92,21 @@ public partial class Home : ComponentBase
         {
             var groups = GetUnderChartGroups();
             _underChartGroupNames = groups.Select(g => g.Key).ToList();
-            _underChartCount = groups.Count;
-            _underCharts = new ChartComponent[_underChartCount];
         }
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        Console.WriteLine($"[Home] OnAfterRenderAsync called (firstRender={firstRender}). " +
-                          $"_chartDatas is null: {_chartDatas == null}. _chartsInitialized: {_chartsInitialized}. " +
-                          $"_underChartCount: {_underChartCount}. _underCharts length: {_underCharts?.Length ?? 0}.");
-
-        if (_chartDatas == null || _chartsInitialized) 
+        if (_chartDatas == null || _chartsInitialized) return;
+        
+        if (_underChartGroupNames.Count > 0)
         {
-            Console.WriteLine("[Home] OnAfterRenderAsync returning early: _chartDatas is null or _chartsInitialized is true.");
-            return;
+            if (_underChartGroupNames.Any(name => !_underChartMap.ContainsKey(name) || _underChartMap[name] == null))
+            {
+                return;
+            }
         }
 
-        if (_underChartCount > 0 && _underCharts.Any(c => c == null)) 
-        {
-            int nullCount = _underCharts.Count(c => c == null);
-            Console.WriteLine($"[Home] OnAfterRenderAsync returning early: _underChartCount > 0 and {nullCount} underCharts are null.");
-            return;
-        }
-
-        Console.WriteLine("[Home] OnAfterRenderAsync proceeding to initialize charts.");
         _chartsInitialized = true;
 
         // Remove every series from every chart before re-adding (since components are reused)
@@ -133,24 +121,19 @@ public partial class Home : ComponentBase
 
         // Ensure all components are ready
         if (_mainChart != null) await _mainChart.InitializationCompleted;
-        foreach (var c in _underCharts)
+        foreach (var name in _underChartGroupNames)
         {
+            var c = _underChartMap[name];
             if (c != null) await c.InitializationCompleted;
         }
 
         // Register crosshair handlers
         RegisterCrosshairHandler("Main", _mainChart);
 
-        var underChartGroups = GetUnderChartGroups();
-        int currentUnderChartIndex = 0;
-        _underChartMap.Clear();
-
-        foreach (var group in underChartGroups)
+        foreach (var name in _underChartGroupNames)
         {
-            var chartName = group.Key;
-            var c = _underCharts[currentUnderChartIndex++];
-            _underChartMap[chartName] = c;
-            RegisterCrosshairHandler(chartName, c);
+            var c = _underChartMap[name];
+            RegisterCrosshairHandler(name, c);
         }
 
         // Add all series to their target charts
@@ -161,9 +144,9 @@ public partial class Home : ComponentBase
 
         // Update metrics for all charts
         UpdateMetrics("Main", null);
-        foreach (var group in underChartGroups)
+        foreach (var groupName in _underChartGroupNames)
         {
-            UpdateMetrics(group.Key, null);
+            UpdateMetrics(groupName, null);
         }
         StateHasChanged();
     }
@@ -233,22 +216,18 @@ public partial class Home : ComponentBase
         _liveStrategy = newChart.Strategy;
 
         _primarySeriesMap.Clear();
-        _underChartMap.Clear();
         _chartMetrics.Clear();
 
         if (_chartDatas != null)
         {
             var groups = GetUnderChartGroups();
-            var newCount = groups.Count;
             _underChartGroupNames = groups.Select(g => g.Key).ToList();
-
-            if (newCount != _underChartCount)
+            
+            // Trim dead charts from the map to avoid ghosts
+            foreach (var key in _underChartMap.Keys.ToList())
             {
-                _underChartCount = newCount;
-                if (_underCharts == null || _underCharts.Length < _underChartCount) 
-                {
-                    Array.Resize(ref _underCharts, _underChartCount);
-                }
+                if (!_underChartGroupNames.Contains(key))
+                    _underChartMap.Remove(key);
             }
         }
         StateHasChanged();
@@ -302,7 +281,7 @@ public partial class Home : ComponentBase
                 var ts = await _mainChart.TimeScale();
                 await ts.SetVisibleLogicalRange(e);
             }
-            foreach (var c in _underCharts)
+            foreach (var c in _underChartMap.Values)
             {
                 if (c != null)
                 {
@@ -748,9 +727,9 @@ public partial class Home : ComponentBase
             catch { }
         }
 
-        foreach (var c in _underCharts)
+        foreach (var name in _underChartGroupNames)
         {
-            if (c != null)
+            if (_underChartMap.TryGetValue(name, out var c) && c != null)
             {
                 try
                 {

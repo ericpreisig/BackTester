@@ -211,15 +211,14 @@
 
         @if (_chartDatas != null)
         {
-            @for (var i = 0; i < _underChartCount; i++)
+            @foreach (var currGroupName in _underChartGroupNames)
             {
-                var currentIndex = i;
-                var groupName = _underChartGroupNames.ElementAtOrDefault(currentIndex) ?? "Under";
+                var groupName = currGroupName;
                 var isStickyClass = groupName == "Portfolio" ? "sticky-portfolio" : "";
 
                 <div class="chart-wrapper @isStickyClass" @key="groupName">
                     <div class="sub-chart">
-                        <ChartComponent @ref="_underCharts[currentIndex]" />
+                        <ChartComponent @ref="_underChartMap[groupName]" />
                     </div>
                     <div class="chart-metrics">
                         <h4 style="margin-top: 0; color: #fff; padding-bottom: 5px; border-bottom: 1px solid #2B2B43">@groupName Stats</h4>
