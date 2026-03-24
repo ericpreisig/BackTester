@@ -101,9 +101,24 @@ public partial class Home : ComponentBase
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (_chartDatas == null || _chartsInitialized) return;
-        if (_underChartCount > 0 && _underCharts.Any(c => c == null)) return;
+        Console.WriteLine($"[Home] OnAfterRenderAsync called (firstRender={firstRender}). " +
+                          $"_chartDatas is null: {_chartDatas == null}. _chartsInitialized: {_chartsInitialized}. " +
+                          $"_underChartCount: {_underChartCount}. _underCharts length: {_underCharts?.Length ?? 0}.");
 
+        if (_chartDatas == null || _chartsInitialized) 
+        {
+            Console.WriteLine("[Home] OnAfterRenderAsync returning early: _chartDatas is null or _chartsInitialized is true.");
+            return;
+        }
+
+        if (_underChartCount > 0 && _underCharts.Any(c => c == null)) 
+        {
+            int nullCount = _underCharts.Count(c => c == null);
+            Console.WriteLine($"[Home] OnAfterRenderAsync returning early: _underChartCount > 0 and {nullCount} underCharts are null.");
+            return;
+        }
+
+        Console.WriteLine("[Home] OnAfterRenderAsync proceeding to initialize charts.");
         _chartsInitialized = true;
 
         // Remove every series from every chart before re-adding (since components are reused)
@@ -230,7 +245,10 @@ public partial class Home : ComponentBase
             if (newCount != _underChartCount)
             {
                 _underChartCount = newCount;
-                _underCharts = new ChartComponent[_underChartCount];
+                if (_underCharts == null || _underCharts.Length < _underChartCount) 
+                {
+                    Array.Resize(ref _underCharts, _underChartCount);
+                }
             }
         }
         StateHasChanged();
@@ -657,6 +675,7 @@ public partial class Home : ComponentBase
 
     private async Task AddAllSeriesToCharts()
     {
+        Console.WriteLine($"[Home] AddAllSeriesToCharts start. _chartDatas count: {_chartDatas?.Count() ?? 0}");
         if (_chartDatas == null) return;
 
         foreach (var chartData in _chartDatas)
@@ -669,30 +688,51 @@ public partial class Home : ComponentBase
             if (chartData.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
             {
                 if (string.IsNullOrEmpty(chartData.ChartName) || !_underChartMap.TryGetValue(chartData.ChartName, out targetChart))
+                {
+                    Console.WriteLine($"[Home] Skipping UnderChart: {chartData.Name}. ChartName '{chartData.ChartName}' null or not found in map.");
                     continue;
+                }
                 mapKey = chartData.ChartName;
             }
 
-            if (targetChart == null) continue;
-
-            ISeriesApi<long>? series = chartData.Type switch
+            if (targetChart == null)
             {
-                Engine.Enums.PlotTypeEnum.Line when chartData is IPlotSerie<PlotLine, PlotLineSerieConfig> lineData
-                    => await SetLineSerieAsync(targetChart, lineData),
-                Engine.Enums.PlotTypeEnum.Candle when chartData is IPlotSerie<PlotCandle, PlotCandleSerieConfig> candleData
-                    => await SetCandleSticksSerieAsync(targetChart, candleData),
-                Engine.Enums.PlotTypeEnum.Area when chartData is IPlotSerie<PlotArea, AreaSerieConfig> areaData
-                    => await SetAreaSerieAsync(targetChart, areaData),
-                _ => null
-            };
+                Console.WriteLine($"[Home] Skipping {chartData.Name}. targetChart is null (MapKey: {mapKey}).");
+                continue;
+            }
 
-            if (series != null)
+            Console.WriteLine($"[Home] Setting series for {chartData.Name} on {mapKey}. Type: {chartData.Type}");
+            try 
             {
-                _allSeries.Add((targetChart, series));
-                if (!_primarySeriesMap.ContainsKey(mapKey))
-                    _primarySeriesMap[mapKey] = series;
+                ISeriesApi<long>? series = chartData.Type switch
+                {
+                    Engine.Enums.PlotTypeEnum.Line when chartData is IPlotSerie<PlotLine, PlotLineSerieConfig> lineData
+                        => await SetLineSerieAsync(targetChart, lineData),
+                    Engine.Enums.PlotTypeEnum.Candle when chartData is IPlotSerie<PlotCandle, PlotCandleSerieConfig> candleData
+                        => await SetCandleSticksSerieAsync(targetChart, candleData),
+                    Engine.Enums.PlotTypeEnum.Area when chartData is IPlotSerie<PlotArea, AreaSerieConfig> areaData
+                        => await SetAreaSerieAsync(targetChart, areaData),
+                    _ => null
+                };
+
+                if (series != null)
+                {
+                    _allSeries.Add((targetChart, series));
+                    if (!_primarySeriesMap.ContainsKey(mapKey))
+                        _primarySeriesMap[mapKey] = series;
+                    Console.WriteLine($"[Home] Series added successfully for {mapKey}.");
+                }
+                else
+                {
+                    Console.WriteLine($"[Home] Series creation returned null for {chartData.Name} on {mapKey}.");
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"[Home] Exception adding series {chartData.Name} on {mapKey}: {ex.Message}");
             }
         }
+        Console.WriteLine($"[Home] AddAllSeriesToCharts complete. _allSeries count: {_allSeries.Count}");
     }
 
     private async Task RestoreAndSyncRange(LogicalRange? savedRange)
