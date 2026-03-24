@@ -22,9 +22,6 @@
 
 <PageTitle>Home</PageTitle>
 
-<div style="display:flex; justify-content:space-between; align-items:center;">
-    <h1>Dashboard</h1>
-</div>
 
 <style>
     body {
@@ -32,13 +29,50 @@
         color: #d1d4dc;
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     }
+    .app-layout {
+        display: flex;
+        flex-direction: row;
+        height: 100vh;
+        overflow: hidden;
+    }
+    .sidebar {
+        width: 240px;
+        min-width: 240px;
+        background-color: #1a1e29;
+        border-right: 1px solid #2B2B43;
+        overflow-y: auto;
+        padding: 16px;
+        flex-shrink: 0;
+    }
+    .sidebar-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 4px;
+        border-radius: 4px;
+        cursor: pointer;
+        color: #d1d4dc;
+        font-size: 13px;
+        transition: background 0.15s;
+    }
+    .sidebar-item:hover { background: rgba(41,98,255,0.1); }
+    .sidebar-item.selected { background: rgba(41,98,255,0.2); color: #fff; }
+    .sidebar-section-title {
+        color: #B2B5BE;
+        font-size: 11px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        margin: 16px 0 6px 4px;
+    }
+    .sidebar-section-title:first-child { margin-top: 0; }
     .chart-container {
+        flex: 1;
         display: flex;
         flex-direction: column;
         gap: 15px;
         padding: 20px;
-        max-width: 1400px;
-        margin: 0 auto;
+        overflow-y: auto;
     }
     .chart-wrapper {
         display: flex;
@@ -119,9 +153,32 @@
     }
 </style>
 
-<div class="chart-container">
+<div class="app-layout">
+    <div class="sidebar">
+        <div class="sidebar-section-title">Stratégies</div>
+        @foreach (var t in _availableStrategies)
+        {
+            <div class="sidebar-item @(_selectedStrategyType == t ? "selected" : "")" 
+                 @onclick="@(() => OnSelectStrategy(t))">
+                <span>&#9654;</span> @t.Name.Replace("Strategy", "")
+            </div>
+        }
+
+        <div class="sidebar-section-title">Indicateurs</div>
+        @foreach (var t in _availableIndicators)
+        {
+            var isChecked = _selectedIndicatorTypes.Contains(t);
+            <div class="sidebar-item @(isChecked ? "selected" : "")" 
+                 @onclick="@(() => OnToggleIndicator(t))">
+                <input type="checkbox" checked="@isChecked" style="pointer-events:none;" />
+                @t.Name.Replace("Indicator", "")
+            </div>
+        }
+    </div>
+
+    <div class="chart-container">
     <div class="chart-wrapper">
-        <div class="main-chart" @key="_chartKey">
+        <div class="main-chart">
             <ChartComponent @ref="_mainChart" />
         </div>
         <div class="chart-metrics">
@@ -164,10 +221,10 @@
         @for (var i = 0; i < _underChartCount; i++)
         {
             var currentIndex = i;
-            var groupName = underChartGroups.ElementAtOrDefault(currentIndex)?.Key ?? "Under";
+            var groupName = _underChartGroupNames.ElementAtOrDefault(currentIndex) ?? "Under";
             var isStickyClass = groupName == "Portfolio" ? "sticky-portfolio" : "";
             <div class="chart-wrapper @isStickyClass">
-                <div class="sub-chart" @key="_chartKey">
+                <div class="sub-chart">
                     <ChartComponent @ref="_underCharts[currentIndex]" />
                 </div>
                 <div class="chart-metrics">
@@ -186,6 +243,7 @@
             </div>
         }
     }
+    </div>
 </div>
 
 @code {
@@ -205,6 +263,70 @@
     private IStrategy _liveStrategy;
     private CancellationTokenSource? _debounceCts;
     private LogicalRange? _lastKnownRange = null;
+    private List<string> _underChartGroupNames = new();
+
+    // Sidebar state
+    private List<Type> _availableStrategies = new();
+    private List<Type> _availableIndicators = new();
+    private Type? _selectedStrategyType;
+    private HashSet<Type> _selectedIndicatorTypes = new();
+
+    private object CreateDefaultInstance(Type type)
+    {
+        var ctors = type.GetConstructors().OrderByDescending(c => c.GetParameters().Length);
+        foreach (var ctor in ctors)
+        {
+            var parms = ctor.GetParameters();
+            var args = parms.Select(p =>
+            {
+                if (p.ParameterType == typeof(decimal)) return (object)1000m;
+                if (p.ParameterType == typeof(int)) return (object)20;
+                if (p.ParameterType == typeof(System.Drawing.Color)) return (object)System.Drawing.Color.Blue;
+                if (p.ParameterType.IsValueType) return Activator.CreateInstance(p.ParameterType);
+                return null;
+            }).ToArray();
+            try { return ctor.Invoke(args); } catch { }
+        }
+        return Activator.CreateInstance(type)!;
+    }
+
+    private IStrategy CreateStrategyInstance()
+    {
+        if (_selectedStrategyType != null)
+            return (IStrategy)CreateDefaultInstance(_selectedStrategyType);
+
+        if (_selectedIndicatorTypes.Any())
+        {
+            var indicators = _selectedIndicatorTypes
+                .Select(t => (IIndicator)CreateDefaultInstance(t))
+                .ToArray();
+            return new DefaultStrategy(indicators);
+        }
+
+        // Fallback
+        return (IStrategy)CreateDefaultInstance(_availableStrategies.First());
+    }
+
+    private async Task OnSelectStrategy(Type t)
+    {
+        _selectedStrategyType = t;
+        _selectedIndicatorTypes.Clear();
+        await FullReload();
+    }
+
+    private async Task OnToggleIndicator(Type t)
+    {
+        if (_selectedIndicatorTypes.Contains(t)) _selectedIndicatorTypes.Remove(t);
+        else _selectedIndicatorTypes.Add(t);
+        _selectedStrategyType = null;
+        await FullReload();
+    }
+
+    private async Task FullReload()
+    {
+        _liveStrategy = CreateStrategyInstance();
+        await ReloadChart();
+    }
 
     private async Task HandleInputChanged(PropertyInfo prop, IIndicator indicator, ChangeEventArgs e)
     {
@@ -340,26 +462,26 @@
             }
             catch { }
         }
-        
-        _chartKey++;
 
-        var newStrategy = (IStrategy)Activator.CreateInstance(_liveStrategy.GetType(), 1000m);
-        
+        var symName = (_liveStrategy is BaseStrategy bs) ? bs.SymbolName : "BTC-USD";
+        var newStrategy = CreateStrategyInstance();
+        if (_liveStrategy != null && newStrategy.GetType() == _liveStrategy.GetType())
+            CopyProperties(_liveStrategy, newStrategy);
+
         var newChart = new Chart()
         {
             HistoryFrom = _chart.HistoryFrom,
             DateFrom = _chart.DateFrom,
             Strategy = newStrategy,
-            Symbol = new Symbol("BTC-USD")
+            Symbol = new Symbol(symName)
         };
 
         var context = new Context(newChart);
         await context.PrepareAsync();
-        
-        CopyProperties(_liveStrategy, newChart.Strategy);
 
         _chartDatas = await context.ExecuteOnlyAsync();
         _chart = newChart;
+        _liveStrategy = newChart.Strategy;
         
         _primarySeriesMap.Clear();
         _underChartMap.Clear();
@@ -373,8 +495,15 @@
                 .OrderBy(g => g.Key == "Portfolio" ? 1 : 0).ThenBy(g => g.Key)
                 .ToList();
 
-            _underChartCount = underChartGroups.Count;
-            _underCharts = new ChartComponent[_underChartCount];
+            var newCount = underChartGroups.Count;
+            _underChartGroupNames = underChartGroups.Select(g => g.Key).ToList();
+
+            if (newCount != _underChartCount)
+            {
+                _underChartCount = newCount;
+                _underCharts = new ChartComponent[_underChartCount];
+                _chartKey++; // Only change DOM when number of charts changes
+            }
         }
         StateHasChanged();
     }
@@ -409,12 +538,42 @@
 
     protected override async Task OnInitializedAsync()
     {
+        // Scan assemblies for strategies and indicators
+        var allTypes = AppDomain.CurrentDomain.GetAssemblies()
+            .Where(a => !a.IsDynamic)
+            .SelectMany(a => { try { return a.GetTypes(); } catch { return Array.Empty<Type>(); } })
+            .ToList();
+
+        var strategyBase = typeof(BaseStrategy);
+        var indicatorBase = typeof(BaseIndicator);
+
+        _availableStrategies = allTypes
+            .Where(t => !t.IsAbstract && !t.IsInterface
+                && strategyBase.IsAssignableFrom(t)
+                && t.Name != "DefaultStrategy")
+            .OrderBy(t => t.Name)
+            .ToList();
+
+        // Indicators = BaseIndicator subclasses that are NOT strategies
+        _availableIndicators = allTypes
+            .Where(t => !t.IsAbstract && !t.IsInterface
+                && indicatorBase.IsAssignableFrom(t)
+                && !strategyBase.IsAssignableFrom(t))
+            .OrderBy(t => t.Name)
+            .ToList();
+
+        _selectedStrategyType = _availableStrategies.FirstOrDefault(t => t.Name == "SmaCrossingStrategy")
+                               ?? _availableStrategies.FirstOrDefault();
+
+        var initialStrategy = CreateStrategyInstance();
+        var initialSymbol = (initialStrategy is BaseStrategy bsInit) ? bsInit.SymbolName : "BTC-USD";
+
         _chart = new Chart()
         {
             HistoryFrom = new DateTime(2017, 01, 01),
             DateFrom = new DateTime(2018, 01, 01),
-            Strategy = new SmaCrossingStrategy(1000),
-            Symbol = new Symbol("BTC-USD")
+            Strategy = initialStrategy,
+            Symbol = new Symbol(initialSymbol)
         };
         _liveStrategy = _chart.Strategy;
 
@@ -430,6 +589,7 @@
                 .OrderBy(g => g.Key == "Portfolio" ? 1 : 0).ThenBy(g => g.Key)
                 .ToList();
 
+            _underChartGroupNames = underChartGroups.Select(g => g.Key).ToList();
             _underChartCount = underChartGroups.Count;
             _underCharts = new ChartComponent[_underChartCount];
         }

@@ -11,6 +11,8 @@ namespace Engine.Strategies
 
     public abstract class BaseStrategy : BaseIndicator, IStrategy
     {
+        public string SymbolName { get; set; } = "BTC-USD";
+
         protected Portfolio Portfolio { get; private set; }
         private Portfolio _buyAndHoldPortfolio;
         private PriceIndicator _priceIndicator;
