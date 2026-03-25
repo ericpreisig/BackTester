@@ -661,32 +661,26 @@ public partial class Home : ComponentBase
         {
             if (chartData.Postion == Engine.Enums.PlotPositionEnum.Hidden) continue;
 
-            var targetChart = _mainChart;
-            var mapKey = "Main";
-
-            if (chartData.Postion == Engine.Enums.PlotPositionEnum.UnderChart)
-            {
-                if (string.IsNullOrEmpty(chartData.ChartName) || !_underChartMap.TryGetValue(chartData.ChartName, out targetChart))
-                {
-                    Console.WriteLine($"[Home] Skipping UnderChart: {chartData.Name}. ChartName '{chartData.ChartName}' null or not found in map.");
-                    continue;
-                }
-                mapKey = chartData.ChartName;
-            }
+            var isUnderChart = chartData.Postion == Engine.Enums.PlotPositionEnum.UnderChart;
+            var chartName = isUnderChart ? (chartData.ChartName ?? "Under") : "Main";
+            
+            ChartComponent? targetChart = isUnderChart 
+                ? (_underChartMap.TryGetValue(chartName, out var c) ? c : null)
+                : _mainChart;
 
             if (targetChart == null)
             {
-                Console.WriteLine($"[Home] Skipping {chartData.Name}. targetChart is null (MapKey: {mapKey}).");
+                Console.WriteLine($"[Home] Skipping {chartData.Name}. targetChart is null (MapKey: {chartName}).");
                 continue;
             }
 
-            Console.WriteLine($"[Home] Setting series for {chartData.Name} on {mapKey}. Type: {chartData.Type}");
+            Console.WriteLine($"[Home] Setting series for {chartData.Name} on {chartName}. Type: {chartData.Type}");
             try 
             {
                 ISeriesApi<long>? series = chartData.Type switch
                 {
-                    Engine.Enums.PlotTypeEnum.Line when chartData is IPlotSerie<PlotLine, PlotLineSerieConfig> lineData
-                        => await SetLineSerieAsync(targetChart, lineData),
+                    Engine.Enums.PlotTypeEnum.Line when chartData is IPlotSerie<PlotLine, PlotLineSerieConfig> lineData2
+                        => await SetLineSerieAsync(targetChart, lineData2),
                     Engine.Enums.PlotTypeEnum.Candle when chartData is IPlotSerie<PlotCandle, PlotCandleSerieConfig> candleData
                         => await SetCandleSticksSerieAsync(targetChart, candleData),
                     Engine.Enums.PlotTypeEnum.Area when chartData is IPlotSerie<PlotArea, AreaSerieConfig> areaData
@@ -697,18 +691,18 @@ public partial class Home : ComponentBase
                 if (series != null)
                 {
                     _allSeries.Add((targetChart, series));
-                    if (!_primarySeriesMap.ContainsKey(mapKey))
-                        _primarySeriesMap[mapKey] = series;
-                    Console.WriteLine($"[Home] Series added successfully for {mapKey}.");
+                    if (!_primarySeriesMap.ContainsKey(chartName))
+                        _primarySeriesMap[chartName] = series;
+                    Console.WriteLine($"[Home] Series added successfully for {chartName}.");
                 }
                 else
                 {
-                    Console.WriteLine($"[Home] Series creation returned null for {chartData.Name} on {mapKey}.");
+                    Console.WriteLine($"[Home] Series creation returned null for {chartData.Name} on {chartName}.");
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"[Home] Exception adding series {chartData.Name} on {mapKey}: {ex.Message}");
+                Console.WriteLine($"[Home] Exception adding series {chartData.Name} on {chartName}: {ex.Message}");
             }
         }
         Console.WriteLine($"[Home] AddAllSeriesToCharts complete. _allSeries count: {_allSeries.Count}");
